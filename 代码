@@ -3,497 +3,280 @@ import pandas as pd
 import networkx as nx
 from mlxtend.frequent_patterns import association_rules, fpgrowth
 from mlxtend.preprocessing import TransactionEncoder
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.metrics import (accuracy_score, f1_score, recall_score,
-                             precision_score, roc_auc_score,
-                             confusion_matrix, matthews_corrcoef)
-from lightgbm import LGBMClassifier
-from collections import defaultdict
-from tabulate import tabulate
-import time, warnings, os
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import KBinsDiscretizer
+from typing import List, Dict, Tuple, Optional
 
-# -------------------------- 全局配置 --------------------------
-
-RANDOM_STATE = 42
-N_SPLITS = 5
-
-
-# -------------------------------------------------------------
-
-# ---------------------- 0. 分箱预处理工具 ----------------------
-
-def discretize_data(df, target_col, bins=3):
+class CNFI_NMI_Selector(BaseEstimator, TransformerMixin):
     """
-    将连续特征离散化为 0, 1, 2 (Low, Medium, High)。
-    优先使用 qcut (按频率)，如果失败则使用 cut (按距离)。
-    """
-    data = df.copy()
-    # print(f"   [预处理] 正在将连续特征离散化为 {bins} 箱...")
-
-    for col in data.columns:
-        if col == target_col:
-            continue
-
-        # 只处理数值型列
-        if pd.api.types.is_numeric_dtype(data[col]):
-            # 如果特征本身唯一值很少（例如已经是分类特征），跳过
-            if data[col].nunique() <= bins:
-                # 确保是整数类型
-                data[col] = data[col].fillna(0).astype(int)
-                continue
-
-            try:
-                # qcut: 尽量保证每个箱子里的样本数相同
-                data[col] = pd.qcut(data[col], q=bins, labels=False, duplicates='drop')
-            except ValueError:
-                # cut: 等宽分箱
-                data[col] = pd.cut(data[col], bins=bins, labels=False)
-
-            # 填充缺失值并转为整数
-            data[col] = data[col].fillna(0).astype(int)
-
-    return data
-
-
-# ---------------------- 1. 读取与预处理 ----------------------
-
-def load_and_preprocess(csv_path: str, target_col: str):
-    # 1. 读取原始数据
-    raw_data = pd.read_csv(csv_path)
-
-    # 2. 执行分箱操作 (新增步骤)
-    data = discretize_data(raw_data, target_col, bins=3)
-
-    # 3. 分离 X 和 y
-    X = data.drop(columns=[target_col])
-    y = data[target_col].astype(int)
-    y.name = target_col
-
-    return data, X, y
-
-
-# -------------------------------------------------------------
-
-# ---------------- 2. 因果网络特征推断（无规则质量过滤） -------------
-
-class CausalNetworkFeatureInference:
-    """
-    Mine positive association rules → build directed graph →
-    eigenvalue-based centrality → rank features.
-    无规则质量过滤版本
+    CNFI-NMI: A Robust Feature Selection Framework.
+    
+    Implements the methodology described in:
+    "CNFI-NMI: A Robust Feature Selection Framework Integrating Complex Network 
+    Interactions and Normalized Mutual Information" (BDMA-2026-0010).
+    
+    Attributes:
+        selected_features_ (List[str]): Final list of selected features.
+        feature_scores_ (Dict[str, float]): Combined scores for all features.
     """
 
-    def __init__(self, min_support=0.01, min_conf=0.1,
-                 top_k=4, weight_method="adaptive"):
+    def __init__(self, 
+                 target_col: str, 
+                 n_features: int = 10,
+                 alpha: float = 0.5,
+                 min_support: float = 0.01, 
+                 min_conf: float = 0.1,
+                 n_bins: int = 5,
+                 sigmoid_k: float = 1.0,
+                 sigmoid_theta: float = 0.0):
+        """
+        Args:
+            target_col: Name of the target variable column.
+            n_features: Number of features to select (top-k).
+            alpha: Fusion weight (default 0.5).
+            min_support: FP-Growth support threshold[cite: 636].
+            min_conf: FP-Growth confidence threshold[cite: 636].
+            n_bins: Number of bins for discretization (default 5).
+            sigmoid_k: Slope parameter for adaptive weighting (Eq. 7).
+            sigmoid_theta: Center parameter for adaptive weighting (Eq. 7).
+        """
+        self.target_col = target_col
+        self.n_features = n_features
+        self.alpha = alpha
         self.min_support = min_support
         self.min_conf = min_conf
-        self.top_k = top_k
-        self.weight_method = weight_method
-        self.rule_metrics = ['confidence', 'lift', 'support',
-                             'conviction', 'leverage']
+        self.n_bins = n_bins
+        self.sigmoid_k = sigmoid_k
+        self.sigmoid_theta = sigmoid_theta
+        
+        # Define weight configurations based on paper [cite: 443-446]
+        # w_strong favors Confidence (Reliability)
+        self.w_strong = {
+            'confidence': 0.40, 'lift': 0.20, 'support': 0.10, 
+            'conviction': 0.20, 'leverage': 0.10
+        }
+        # w_weak favors Support (Robustness/Backbone)
+        self.w_weak = {
+            'confidence': 0.10, 'lift': 0.20, 'support': 0.40, 
+            'conviction': 0.10, 'leverage': 0.20
+        }
 
-    # ---------- 2.1 事务集 ----------
-    @staticmethod
-    def _create_transactions(df):
-        tx = []
-        for _, row in df.iterrows():
-            # 这里处理的是离散化后的数据 (0, 1, 2)
-            # 只有非0值被视为"激活"的项，加入事务
-            tx.append([col for col in df.columns if row[col] not in (0, False, np.nan)])
-        return tx
-
-    # ---------- 2.2 规则挖掘 ----------
-    def _mine_rules(self, df):
-        tx = self._create_transactions(df)
-        if not tx:
-            return pd.DataFrame()
-
-        te = TransactionEncoder()
-        # 转换为布尔矩阵用于挖掘
-        encoded = pd.DataFrame(te.fit_transform(tx), columns=te.columns_)
-        dyn_conf = max(.15, self.min_conf - 0.005 * (encoded.shape[1] - 1))
-
-        freq = fpgrowth(encoded, min_support=self.min_support,
-                        use_colnames=True, max_len=2)
-        if freq.empty:
-            return pd.DataFrame()
-
-        rules = association_rules(freq, metric="confidence",
-                                  min_threshold=dyn_conf)
-
-        # 保证包含所有指标
-        if 'conviction' not in rules.columns:
-            rules['conviction'] = np.where(
-                rules['consequent support'] == 1,
-                np.inf,
-                (1 - rules['consequent support']) /
-                (1 - rules['confidence'])
-            )
-        if 'leverage' not in rules.columns:
-            rules['leverage'] = rules['support'] - \
-                                rules['antecedent support'] * rules['consequent support']
-        return rules[['antecedents', 'consequents'] + self.rule_metrics]
-
-    # ---------- 2.3 复合权重 ----------
-    def _rule_weight(self, rule):
-        if self.weight_method == 'adaptive':
-            w = {'confidence': .35, 'lift': .25, 'support': .15,
-                 'conviction': .15, 'leverage': .10}
-            if rule['lift'] > 3:  # 强关联→抬高 lift 权重
-                w['lift'] += .15
-                for k in ('confidence', 'support', 'conviction'):
-                    w[k] -= .05
-            elif rule['lift'] < 1.2:  # 弱关联→降低 lift 权重
-                w['lift'] -= .15
-                for k in ('confidence', 'support', 'conviction'):
-                    w[k] += .05
-            total = sum(w.values())
-            w = {k: v / total for k, v in w.items()}
-        else:  # default: lift*confidence
-            return rule['lift'] * rule['confidence']
-
-        score = 0
-        for m, wt in w.items():
-            v = 10 if (m == 'conviction' and np.isinf(rule[m])) else rule[m]
-            score += wt * v
-        return score
-
-    # ---------- 2.4 构网（删除规则质量过滤） ----------
-    def _build_graph(self, rules):
-        G = nx.DiGraph()
-        for _, r in rules.iterrows():
-            # 删除规则质量过滤
-            src = next(iter(r['antecedents']))
-            dst = next(iter(r['consequents']))
-            G.add_edge(src, dst, weight=self._rule_weight(r))
-        return G
-
-    # ---------- 2.5 改进PageRank ----------
-    @staticmethod
-    def _eigen_rank(G, max_iter=100, tol=1e-6):
-        nodes = list(G.nodes())
-        if not nodes:
-            return {}
-        n = len(nodes)
-        A = nx.to_numpy_array(G, nodelist=nodes, weight='weight')
-        kin = (A > 0).sum(0)
-        M = np.zeros((n + 1, n + 1))
-        M[:-1, :-1] = A
-        M[:-1, -1] = 1
-        M[-1, :-1] = kin / (kin.sum() + 1e-8)
-
-        pr = np.array([nx.pagerank(G, weight='weight').get(v, 0) for v in nodes])
-        sout = A.sum(1)
-        mu = .5 * pr + .5 * sout
-
-        vec = np.ones(n + 1)
-        for _ in range(max_iter):
-            nxt = M @ vec
-            nxt /= np.linalg.norm(nxt)
-            if np.linalg.norm(nxt - vec) < tol:
-                break
-            vec = nxt
-        scores = vec[:-1] + mu * vec[-1]
-        return dict(zip(nodes, scores))
-
-    # ---------- 2.6 主接口 ----------
-    def fit(self, df, target_col):
-        feats_df = df.drop(columns=[target_col])
-        rules = self._mine_rules(feats_df)
-        if rules.empty:
-            return []
-        G = self._build_graph(rules)
-        scores = self._eigen_rank(G)
-        return [f for f, _ in sorted(scores.items(),
-                                     key=lambda x: x[1],
-                                     reverse=True)[:self.top_k]]
-
-
-# -------------------------------------------------------------
-
-# ---------------- 3. 归一化互信息 -----------------------------
-
-class NormalizedMutualInformation:
-    """Shannon-based NMI for discrete features."""
-
-    @staticmethod
-    def _nmi_single(X, y, feat):
-        states, targets = X[feat].unique(), y.unique()
-        if len(states) <= 1 or len(targets) <= 1:
-            return 0
-        joint = np.zeros((len(targets), len(states)))
-        for i, t in enumerate(targets):
-            for j, s in enumerate(states):
-                joint[i, j] = ((X[feat] == s) & (y == t)).sum()
-        if joint.sum() == 0:
-            return 0
-        pxy = joint / joint.sum()
-        px = pxy.sum(0)
-        py = pxy.sum(1)
-
-        mi = sum(pxy[i, j] * np.log2(pxy[i, j] / (py[i] * px[j]))
-                 for i in range(len(py)) for j in range(len(px)) if pxy[i, j] > 0)
-        hx = -sum(p * np.log2(p) for p in px if p > 0)
-        hy = -sum(p * np.log2(p) for p in py if p > 0)
-        return 2 * mi / (hx + hy) if hx + hy else 0
-
-    def rank(self, df, target_col, cand_feats):
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
-        scores = {f: self._nmi_single(X, y, f) for f in cand_feats}
-        return [f for f, _ in sorted(scores.items(),
-                                     key=lambda x: x[1],
-                                     reverse=True)]
-
-
-# -------------------------------------------------------------
-
-# -------------- 4. 双理论特征选择框架 --------------------------
-
-class DualTheorySelector:
-    """CNFI + NMI 互补选特征"""
-
-    def __init__(self, target_col, cnfi_params=None,
-                 max_feats=None, weight_method='adaptive'):
-        self.t_col = target_col
-        self.cnfi_params = cnfi_params or {}
-        self.max_feats = max_feats
-        self.weight_method = weight_method
-        self.sel_feats, self.feat_scores = None, None
-
-    def fit(self, X, y):
-        # 这里的 X 已经是分箱后的数据 (0,1,2)
+    def fit(self, X: pd.DataFrame, y: pd.Series = None):
+        """
+        Executes the three-stage feature selection process.
+        """
+        # --- Preprocessing: Equal-Frequency Discretization  ---
+        # Note: We combine X and y for rule mining context
         data = X.copy()
-        data[self.t_col] = y
-
-        # 1) CNFI
-        cnfi = CausalNetworkFeatureInference(weight_method=self.weight_method,
-                                             **self.cnfi_params)
-        cnfi_feats = cnfi.fit(data, self.t_col)
-        cnfi_rank = {f: (len(cnfi_feats) - i) / len(cnfi_feats)
-                     for i, f in enumerate(cnfi_feats)}
-
-        # 2) NMI
-        remain = list(set(X.columns) - set(cnfi_feats))
-        nmi_ranked = NormalizedMutualInformation().rank(data, self.t_col, remain)
-        nmi_rank = {f: (len(nmi_ranked) - i) / len(nmi_ranked)
-                    for i, f in enumerate(nmi_ranked)}
-
-        # 3) 合并
-        scores = {f: 0.5 * cnfi_rank.get(f, 0) + 0.5 * nmi_rank.get(f, 0)
-                  for f in X.columns}
-        ordered = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        if self.max_feats:
-            ordered = ordered[:self.max_feats]
-
-        self.sel_feats = [f for f, _ in ordered]
-        self.feat_scores = scores
+        if y is not None:
+            data[self.target_col] = y
+        
+        df_binned = self._discretize(data)
+        
+        # --- Stage 1: CNFI (Complex Network Feature Interaction) ---
+        cnfi_scores, cnfi_selected = self._stage_1_cnfi(df_binned)
+        
+        # --- Stage 2: NMI (Normalized Mutual Information) ---
+        # Only calculated for features NOT selected in Stage 1 [cite: 517]
+        remain_features = [f for f in X.columns if f not in cnfi_selected]
+        nmi_scores = self._stage_2_nmi(df_binned, remain_features)
+        
+        # --- Stage 3: Fusion [cite: 600-603] ---
+        self.feature_scores_ = self._stage_3_fusion(cnfi_scores, nmi_scores, X.columns)
+        
+        # Select Top-K
+        sorted_feats = sorted(self.feature_scores_.items(), key=lambda x: x[1], reverse=True)
+        self.selected_features_ = [f for f, s in sorted_feats[:self.n_features]]
+        
         return self
 
-    def transform(self, X):  # 调用时 selector.transform(X)
-        if self.sel_feats is None:
-            raise RuntimeError("Selector not fitted.")
-        return X[self.sel_feats]
+    def transform(self, X: pd.DataFrame):
+        return X[self.selected_features_]
 
+    def _discretize(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Applies Equal-Frequency Binning (5 bins) as per.
+        """
+        df_disc = df.copy()
+        for col in df.columns:
+            if col == self.target_col: 
+                continue # Target often treated as categorical
+            if pd.api.types.is_numeric_dtype(df[col]) and df[col].nunique() > self.n_bins:
+                try:
+                    # qcut for equal frequency
+                    df_disc[col] = pd.qcut(df[col], q=self.n_bins, labels=False, duplicates='drop')
+                except ValueError:
+                    # Fallback to cut if data is skewed/sparse
+                    df_disc[col] = pd.cut(df[col], bins=self.n_bins, labels=False)
+            else:
+                # Ensure categorical/integer encoding
+                df_disc[col] = df_disc[col].astype('category').cat.codes
+        return df_disc
 
-# -------------------------------------------------------------
+    def _stage_1_cnfi(self, df: pd.DataFrame) -> Tuple[Dict[str, float], List[str]]:
+        """
+        Mines association rules and computes Eigen-Rank.
+        """
+        # 1. Transaction Generation
+        tx = []
+        features_only = df.drop(columns=[self.target_col])
+        for idx, row in features_only.iterrows():
+            # Create itemset: "FeatureName::BinValue"
+            tx.append([f"{col}::{val}" for col, val in row.items()])
+            
+        # 2. FP-Growth [cite: 292]
+        te = TransactionEncoder()
+        te_ary = te.fit_transform(tx)
+        df_encoded = pd.DataFrame(te_ary, columns=te.columns_)
+        
+        frequent = fpgrowth(df_encoded, min_support=self.min_support, use_colnames=True, max_len=2)
+        if frequent.empty:
+            return {}, []
+            
+        # 3. Rule Generation with all metrics [cite: 295-312]
+        rules = association_rules(frequent, metric="confidence", 
+                                  min_threshold=self.min_conf, support_only=False)
+        
+        # 4. Composite Adaptive Weighting [cite: 316-326]
+        # Calculate Log(Lift) for PMI proxy
+        rules['log_lift'] = np.log(rules['lift'] + 1e-8)
+        
+        # Calculate lambda (Sigmoid function) - Eq (7)
+        # lambda = 1 / (1 + e^(-k * (log_lift - theta)))
+        rules['lambda'] = 1 / (1 + np.exp(-self.sigmoid_k * (rules['log_lift'] - self.sigmoid_theta)))
+        
+        # Calculate final weight - Eq (6) & (8)
+        # W = lambda * Score_strong + (1-lambda) * Score_weak
+        w_list = []
+        for _, r in rules.iterrows():
+            score_strong = sum(r[m] * w for m, w in self.w_strong.items() if m in r)
+            score_weak = sum(r[m] * w for m, w in self.w_weak.items() if m in r)
+            w_final = r['lambda'] * score_strong + (1 - r['lambda']) * score_weak
+            w_list.append(w_final)
+        
+        rules['weight'] = w_list
 
-# -------------- 5. 交叉验证评估 ------------------------------
+        # 5. Build Graph & Eigen-Rank [cite: 313, 447]
+        G = nx.DiGraph()
+        for i, r in rules.iterrows():
+            src = list(r['antecedents'])[0].split("::")[0] # Extract raw feature name
+            dst = list(r['consequents'])[0].split("::")[0]
+            if src != dst:
+                G.add_edge(src, dst, weight=r['weight'])
+                
+        # Calculate Eigen-Rank scores
+        er_scores = self._calculate_eigen_rank(G)
+        
+        # Normalize R_CNFI based on rank [cite: 522]
+        sorted_nodes = sorted(er_scores, key=er_scores.get, reverse=True)
+        N_cnfi = len(sorted_nodes)
+        norm_scores = {node: (N_cnfi - i) / N_cnfi for i, node in enumerate(sorted_nodes)}
+        
+        # Determine top features (heuristic: top 50% or top-N for next stage exclusion)
+        # Paper implies CNFI selects a subset, NMI ranks the rest. 
+        # Here we return all scored features but mark top ones.
+        return norm_scores, sorted_nodes[:len(sorted_nodes)//2]
 
-def evaluate_cv(X, y, target_col, max_feats=None, weight_method='adaptive'):
-    cv = StratifiedKFold(n_splits=N_SPLITS, shuffle=True,
-                         random_state=RANDOM_STATE)
-    metrics = defaultdict(list)
-    feat_imp, feat_cnt = defaultdict(float), defaultdict(int)
+    def _calculate_eigen_rank(self, G: nx.DiGraph) -> Dict[str, float]:
+        """
+        Implements Eigen-Rank centrality [cite: 447-467].
+        """
+        nodes = list(G.nodes())
+        n = len(nodes)
+        if n == 0: return {}
+        
+        # Adjacency Matrix A (Weighted)
+        A = nx.to_numpy_array(G, nodelist=nodes, weight='weight')
+        
+        # In-degree k_in
+        k_in = (A > 0).sum(axis=0)
+        
+        # Extended Transition Matrix M - Eq (11)
+        # Last column is p (jump probability based on normalized in-degree)
+        p = k_in / (k_in.sum() + 1e-8) # Eq (12)
+        
+        M = np.zeros((n + 1, n + 1))
+        M[:n, :n] = A
+        M[:n, n] = 1.0 # Last column (virtual node -> all nodes)
+        M[n, :n] = p   # Last row (all nodes -> virtual node)
+        
+        # Power Iteration
+        L = np.ones(n + 1) / (n + 1)
+        for _ in range(100):
+            L_next = M @ L
+            L_next /= np.linalg.norm(L_next) # Normalization Eq (17)
+            if np.linalg.norm(L_next - L) < 1e-6:
+                L = L_next
+                break
+            L = L_next
+            
+        # Influence Vector mu - Eq (15)
+        # mu = 0.5 * norm(PR) + 0.5 * norm(S_out)
+        pr = np.array(list(nx.pagerank(G, weight='weight').values()))
+        s_out = A.sum(axis=1)
+        
+        # Normalize vectors to [0,1] or unit norm as implied by "norm()"
+        def normalize(v): return (v - v.min()) / (v.max() - v.min() + 1e-8)
+        
+        mu = 0.5 * normalize(pr) + 0.5 * normalize(s_out)
+        
+        # Final Score - Eq (18): S(Fi) = Li + mu_i * L_{n+1}
+        scores = {}
+        L_global = L[n] # The component of the virtual node
+        for i, node in enumerate(nodes):
+            scores[node] = L[i] + mu[i] * L_global
+            
+        return scores
 
-    # 注意：这里的 X 和 y 已经是离散化后的数据
-    for fold, (tr, te) in enumerate(cv.split(X, y), 1):
-        X_tr, X_te = X.iloc[tr], X.iloc[te]
-        y_tr, y_te = y.iloc[tr], y.iloc[te]
+    def _stage_2_nmi(self, df: pd.DataFrame, features: List[str]) -> Dict[str, float]:
+        """
+        Calculates NMI for remaining features [cite: 485-517].
+        """
+        y = df[self.target_col]
+        scores = {}
+        from sklearn.metrics import normalized_mutual_info_score
+        
+        for feat in features:
+            if feat not in df.columns: continue
+            # Use 'arithmetic' average for NMI denominator as standard proxy for Eq 24
+            score = normalized_mutual_info_score(y, df[feat], average_method='arithmetic')
+            scores[feat] = score
+            
+        # Normalize R_NMI based on rank [cite: 536]
+        sorted_feats = sorted(scores, key=scores.get, reverse=True)
+        N_nmi = len(sorted_feats)
+        rank_scores = {f: (N_nmi - i) / N_nmi for i, f in enumerate(sorted_feats)}
+        return rank_scores
 
-        tic = time.time()
-        sel = DualTheorySelector(target_col, max_feats=max_feats,
-                                 weight_method=weight_method)
-        sel.fit(X_tr, y_tr)
-        X_tr_sel, X_te_sel = sel.transform(X_tr), sel.transform(X_te)
+    def _stage_3_fusion(self, cnfi_scores: Dict, nmi_scores: Dict, all_feats: List[str]) -> Dict:
+        """
+        Fuses scores using parameter alpha[cite: 601].
+        """
+        final_scores = {}
+        for f in all_feats:
+            if f == self.target_col: continue
+            s_c = cnfi_scores.get(f, 0.0)
+            s_n = nmi_scores.get(f, 0.0)
+            # Eq (26)
+            final_scores[f] = self.alpha * s_c + (1 - self.alpha) * s_n
+        return final_scores
 
-        # 使用 LightGBM 训练，它对离散整数特征支持良好
-        model = LGBMClassifier(random_state=RANDOM_STATE, verbose=-1)
-        model.fit(X_tr_sel, y_tr)
-        toc = time.time() - tic
-
-        y_pred = model.predict(X_te_sel)
-        y_prob = model.predict_proba(X_te_sel)[:, 1]
-
-        tn, fp, fn, tp = confusion_matrix(y_te, y_pred).ravel()
-        metrics['Accuracy'].append(accuracy_score(y_te, y_pred))
-        metrics['Precision'].append(precision_score(y_te, y_pred))
-        metrics['Recall'].append(recall_score(y_te, y_pred))
-        metrics['F1'].append(f1_score(y_te, y_pred))
-        metrics['Specificity'].append(tn / (tn + fp) if tn + fp else 0)
-        metrics['AUC'].append(roc_auc_score(y_te, y_prob))
-        metrics['Train_Time'].append(toc)
-        metrics['Selected'].append(len(sel.sel_feats))
-
-        for f in sel.sel_feats:
-            feat_imp[f] += sel.feat_scores[f]
-            feat_cnt[f] += 1
-
-        print(f"Fold {fold}: F1={metrics['F1'][-1]:.4f}, "
-              f"AUC={metrics['AUC'][-1]:.4f}, "
-              f"Features={len(sel.sel_feats)}")
-
-    return metrics, feat_imp, feat_cnt
-
-
-# -------------------------------------------------------------
-
-# ----------------- 6. 输出汇总 -------------------------------
-
-def report(metrics, feat_imp, feat_cnt, outdir=None):
-    tbl = []
-    for m in ('Accuracy', 'F1', 'Precision', 'Recall',
-              'Specificity', 'AUC'):
-        vals = metrics[m]
-        tbl.append([m, np.mean(vals), np.std(vals),
-                    np.min(vals), np.max(vals)])
-    print("\n" + "=" * 29 + " CV Performance " + "=" * 29)
-    print(tabulate(tbl, headers=["Metric", "Mean", "Std", "Min", "Max"],
-                   tablefmt="grid", floatfmt=".4f"))
-
-    print(f"\nAvg selected features: "
-          f"{np.mean(metrics['Selected']):.2f} ± "
-          f"{np.std(metrics['Selected']):.2f}")
-    print(f"Avg training time: "
-          f"{np.mean(metrics['Train_Time']):.2f} ± "
-          f"{np.std(metrics['Train_Time']):.2f} seconds")
-
-    top = sorted(feat_imp.items(), key=lambda x: x[1] / feat_cnt[x[0]], reverse=True)[:20]
-    print("\n" + "=" * 30 + " Top-20 Features " + "=" * 30)
-    print(tabulate([[f, feat_imp[f] / feat_cnt[f], f"{feat_cnt[f] / N_SPLITS:.2%}"]
-                    for f, _ in top],
-                   headers=["Feature", "AvgImportance", "SelFreq"],
-                   tablefmt="grid", floatfmt=".4f"))
-
-    if outdir:
-        pd.DataFrame({
-            'Feature': list(feat_imp.keys()),
-            'AvgImportance': [feat_imp[f] / feat_cnt[f] for f in feat_imp],
-            'SelFreq': [feat_cnt[f] / N_SPLITS for f in feat_imp]
-        }).sort_values('AvgImportance', ascending=False) \
-            .to_csv(os.path.join(outdir, "feature_importance.csv"), index=False)
-
-
-# -------------------------------------------------------------
-
-# ---------------- 7. 主流程 -------------------------------
-
-def main():
-    print("CNFI+NMI 双理论特征选择框架（含 3箱离散化预处理）")
-    print("=" * 50)
-    print("配置参数:")
-    print("- 数据处理: 自动分箱 (Bins=3)")
-    print("- 最小支持度: 0.01")
-    print("- 最小置信度: 0.1")
-    print("- 无规则质量过滤")
-    print("=" * 50)
-
-    # 询问用户是否使用示例数据
-    use_sample = input("是否使用示例数据？(y/n, 默认y): ").strip().lower()
-
-    if use_sample != 'n':
-        print("生成示例数据集(包含连续浮点数)...")
-        # 创建示例数据
-        np.random.seed(RANDOM_STATE)
-        n_samples, n_features = 1000, 20
-
-        # 创建连续特征 (正态分布)
-        X = np.random.randn(n_samples, n_features)
-
-        # 创建目标变量，与一些特征相关
-        important_features = [0, 3, 7, 12, 15]
-        y = np.zeros(n_samples)
-
-        for i in important_features:
-            # 线性关系，加上噪声
-            y += X[:, i] * np.random.uniform(0.5, 1.5)
-
-        # 添加噪声并二值化目标
-        y += np.random.normal(0, 0.5, n_samples)
-        y = (y > np.median(y)).astype(int)
-
-        # 转换为DataFrame
-        feature_names = [f'feature_{i}' for i in range(n_features)]
-        data = pd.DataFrame(X, columns=feature_names)
-        data['target'] = y
-
-        # 保存示例数据
-        sample_path = "sample_data_continuous.csv"
-        data.to_csv(sample_path, index=False)
-        csv_path = sample_path
-        tgt = 'target'
-
-        print(f"示例数据已保存到: {sample_path}")
-
-    else:
-        csv_path = input("CSV 文件路径: ").strip()
-        tgt = input("目标列 (默认 cardio): ").strip() or 'cardio'
-
-    max_f = input("最大特征数 (回车=不限): ").strip()
-    max_f = int(max_f) if max_f else None
-
-    outdir = os.path.join(os.path.dirname(csv_path), "cnfi_nmi_results_binned")
-    os.makedirs(outdir, exist_ok=True)
-
-    print("加载并分箱数据…")
-    # 这里会调用 discretize_data
-    _, X, y = load_and_preprocess(csv_path, tgt)
-
-    print(f"样本 {X.shape[0]}, 特征 {X.shape[1]}")
-    print(f"目标变量分布: {y.value_counts().to_dict()}")
-    # 打印前几行看看分箱效果
-    print("分箱后数据预览 (前5行):")
-    print(X.head())
-
-    print("\n交叉验证评估…")
-    metrics, feat_imp, feat_cnt = evaluate_cv(X, y, tgt,
-                                              max_feats=max_f)
-    report(metrics, feat_imp, feat_cnt, outdir)
-
-    # 训练完整模型
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE)
-
-    sel = DualTheorySelector(tgt, max_feats=max_f).fit(X_tr, y_tr)
-    model = LGBMClassifier(random_state=RANDOM_STATE, verbose=-1)
-    model.fit(sel.transform(X_tr), y_tr)
-
-    y_pred = model.predict(sel.transform(X_te))
-    y_prob = model.predict_proba(sel.transform(X_te))[:, 1]
-
-    print("\n" + "=" * 30 + " Final Model " + "=" * 30)
-    print(f"Accuracy {accuracy_score(y_te, y_pred):.4f}")
-    print(f"F1       {f1_score(y_te, y_pred):.4f}")
-    print(f"AUC-ROC  {roc_auc_score(y_te, y_prob):.4f}")
-    print(f"MCC      {matthews_corrcoef(y_te, y_pred):.4f}")
-
-    tn, fp, fn, tp = confusion_matrix(y_te, y_pred).ravel()
-    print("\nConfusion Matrix")
-    print(tabulate([["Act 0", tn, fp], ["Act 1", fn, tp]],
-                   headers=["", "Pred 0", "Pred 1"], tablefmt="grid"))
-
-    # 保存最终特征
-    with open(os.path.join(outdir, "final_selected_features.txt"), "w") as f:
-        f.write("CNFI+NMI 选择的特征（分箱后+无规则过滤）:\n")
-        f.write("=" * 40 + "\n")
-        for i, feat in enumerate(sel.sel_feats, 1):
-            f.write(f"{i}. {feat}\n")
-
-    print(f"\n全部结果已存入 {outdir}")
-
-
+# -----------------------------------------------------------
+# 使用示例 (Usage Example)
+# -----------------------------------------------------------
 if __name__ == "__main__":
-    warnings.filterwarnings("ignore")
-    t0 = time.time()
-    main()
-    print(f"\nTotal elapsed: {(time.time() - t0) / 60:.2f} min")
+    # 生成模拟数据
+    X_dummy = pd.DataFrame(np.random.rand(200, 20), columns=[f'feat_{i}' for i in range(20)])
+    y_dummy = np.random.randint(0, 2, 200)
+    
+    # 初始化选择器
+    selector = CNFI_NMI_Selector(target_col='target', n_features=5, n_bins=5)
+    
+    # 拟合
+    selector.fit(X_dummy, pd.Series(y_dummy, name='target'))
+    
+    # 输出结果
+    print("Selected Features:", selector.selected_features_)
+    print("Feature Scores (Top 5):")
+    for f in selector.selected_features_:
+        print(f"{f}: {selector.feature_scores_[f]:.4f}")
