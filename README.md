@@ -8,7 +8,7 @@ Xiaoming Li · Nuoyan Xu · Li Shen · Yao Huang · Xincheng Wang · Yingjie Xu 
 
 Accepted manuscript · *Big Data Mining and Analytics* · BDMA-2026-0010
 
-[Paper](paper/BDMA-2026-0010.pdf) · [Method-to-code map](docs/METHODOLOGY.md) · [Reproducibility protocol](docs/REPRODUCIBILITY.md) · [中文说明](README_zh-CN.md)
+[Method-to-code map](docs/METHODOLOGY.md) · [Reproducibility protocol](docs/REPRODUCIBILITY.md) · [中文说明](README_zh-CN.md)
 
 </div>
 
@@ -88,7 +88,7 @@ tests/              equation and API regression tests
 scripts/            leakage-safe five-fold experiment runner
 examples/           synthetic quick start
 docs/               method mapping and reproducibility protocol
-paper/              accepted manuscript in its original layout
+paper/              manuscript provenance and availability notice
 data/               provenance requirements; raw data are not redistributed
 legacy/             original two-file snapshot for auditability
 ```

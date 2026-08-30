@@ -6,7 +6,7 @@
 
 录用稿 · *Big Data Mining and Analytics* · BDMA-2026-0010
 
-[原文 PDF](paper/BDMA-2026-0010.pdf) · [方法与代码对应关系](docs/METHODOLOGY.md) · [复现实验规范](docs/REPRODUCIBILITY.md) · [English](README.md)
+[方法与代码对应关系](docs/METHODOLOGY.md) · [复现实验规范](docs/REPRODUCIBILITY.md) · [English](README.md)
 
 </div>
 
@@ -60,7 +60,7 @@ tests/              公式与接口回归测试
 scripts/            无泄漏的五折 LightGBM 实验脚本
 examples/           可直接运行的合成数据示例
 docs/               方法映射与严格复现规范
-paper/              保留原排版的录用稿 PDF
+paper/              论文来源与获取说明
 data/               数据来源与校验要求（不直接分发原始数据）
 legacy/             原仓库代码快照，仅供审计追溯
 ```
