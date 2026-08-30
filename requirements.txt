@@ -1,0 +1,4 @@
+-e .
+
+# Install the experiment and test extras with:
+# python -m pip install -e ".[experiments,test]"

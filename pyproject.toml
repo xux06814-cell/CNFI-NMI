@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cnfi-nmi"
+version = "0.1.0"
+description = "Reference implementation of CNFI-NMI feature selection"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  {name = "Xiaoming Li"},
+  {name = "Nuoyan Xu"},
+  {name = "Li Shen"},
+  {name = "Yao Huang"},
+  {name = "Xincheng Wang"},
+  {name = "Yingjie Xu"},
+  {name = "Wanghao Wu"},
+  {name = "Guangquan Xu"},
+  {name = "Liangchen Liu"},
+]
+dependencies = [
+  "mlxtend>=0.23,<1",
+  "networkx>=3.1,<4",
+  "numpy>=1.24,<3",
+  "pandas>=2.0,<4",
+  "scikit-learn>=1.3,<2",
+]
+
+[project.optional-dependencies]
+experiments = ["lightgbm>=4,<5"]
+test = ["pytest>=8,<9"]
+
+[project.urls]
+Repository = "https://github.com/xux06814-cell/CNFI-NMI"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
