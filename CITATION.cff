@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the CNFI-NMI manuscript."
+title: "CNFI-NMI: A Robust Feature Selection Framework Integrating Complex Network Interactions and Normalized Mutual Information"
+type: software
+version: 0.1.0
+repository-code: "https://github.com/xux06814-cell/CNFI-NMI"
+authors:
+  - family-names: Li
+    given-names: Xiaoming
+  - family-names: Xu
+    given-names: Nuoyan
+  - family-names: Shen
+    given-names: Li
+  - family-names: Huang
+    given-names: Yao
+  - family-names: Wang
+    given-names: Xincheng
+  - family-names: Xu
+    given-names: Yingjie
+  - family-names: Wu
+    given-names: Wanghao
+  - family-names: Xu
+    given-names: Guangquan
+  - family-names: Liu
+    given-names: Liangchen
+preferred-citation:
+  type: article
+  title: "CNFI-NMI: A Robust Feature Selection Framework Integrating Complex Network Interactions and Normalized Mutual Information"
+  journal: "Big Data Mining and Analytics"
+  year: 2026
+  authors:
+    - family-names: Li
+      given-names: Xiaoming
+    - family-names: Xu
+      given-names: Nuoyan
+    - family-names: Shen
+      given-names: Li
+    - family-names: Huang
+      given-names: Yao
+    - family-names: Wang
+      given-names: Xincheng
+    - family-names: Xu
+      given-names: Yingjie
+    - family-names: Wu
+      given-names: Wanghao
+    - family-names: Xu
+      given-names: Guangquan
+    - family-names: Liu
+      given-names: Liangchen
