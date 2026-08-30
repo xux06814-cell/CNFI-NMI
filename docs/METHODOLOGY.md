@@ -1,7 +1,8 @@
 # Method-to-code correspondence
 
 This document maps the accepted manuscript (BDMA-2026-0010) to the reference
-implementation. Equation numbers refer to the manuscript PDF in `paper/`.
+implementation. Equation numbers refer to the manuscript, which is not
+redistributed in this repository.
 
 ## Stage 1 - Complex Network Feature Interaction
 
