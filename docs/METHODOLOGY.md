@@ -51,21 +51,29 @@ expression has a zero denominator and carries no usable ranking information.
 
 ## Stage 3 - Rank fusion
 
-The top $k_f$ CNFI features and the remaining NMI-ranked features are disjoint.
-For a list of size $N$, the repository implements the manuscript literally:
+Both CNFI and NMI independently rank every input feature. With $d$ input
+features, both list lengths are $N_{cnfi}=N_{nmi}=d$; there is no intermediate
+CNFI truncation or remaining-feature branch. For each full list of size $N$,
+the rank score is:
 
 $$
 R(F_i)=\frac{N-\mathrm{rank}(i)}{N}.
 $$
 
 Consequently, the best feature scores $(N-1)/N$ and the last feature scores 0.
-The final score is $S_{final}=\alpha R_{CNFI}+(1-\alpha)R_{NMI}$ (Eq. 29).
+For each feature, the final score is
+$S_{final}=\alpha R_{CNFI}+(1-\alpha)R_{NMI}$ (Eq. 29). Scores are matched
+by feature name before weighting. At $\alpha=1$ the ranking follows CNFI; at
+$\alpha=0$ it follows NMI across all inputs. Ties retain input-column order.
+Only the final fused ranking is truncated by `n_features_to_select` ($k_{max}$).
+
+The old `cnfi_features` argument is retained for API compatibility but accepts
+only `None` or $d$. It no longer creates an independently truncated branch.
 
 ## Explicit implementation convention
 
 FP-Growth produces multiple bin-level rules that may collapse to the same raw
-feature pair. The manuscript defines one adjacency entry $A_{ij}$ but does not
-state how duplicate state-level rules are reduced. This implementation uses
-the maximum rule weight by default (`edge_aggregation="max"`), with `mean` and
-`sum` available for sensitivity analysis. This convention is disclosed rather
-than presented as a claim from the paper.
+feature pair. The manuscript defines one adjacency entry $A_{ij}$ per directed feature
+pair by taking the maximum rule weight. This is the implementation default
+(`edge_aggregation="max"`); `mean` and `sum` remain optional alternatives for
+sensitivity analysis.

@@ -29,8 +29,8 @@ METRIC_ORDER: MetricOrder = (
 class CNFINMISelector(TransformerMixin, BaseEstimator):
     """Select tabular features by interaction structure and target relevance.
 
-    Parameters follow the accepted manuscript. ``cnfi_features`` is the paper's
-    :math:`k_f`, while ``n_features_to_select`` is the optional :math:`k_max`.
+    Both branches rank all input features. ``n_features_to_select`` is the
+    optional final :math:`k_max`, applied only after per-feature rank fusion.
     The implementation keeps feature selection inside ``fit`` so it can be used
     safely in a scikit-learn cross-validation pipeline.
 
@@ -40,9 +40,10 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         Number of features returned by ``transform``. ``None`` keeps the full
         fused ranking.
     cnfi_features:
-        Number of features assigned to the CNFI list. ``None`` uses half of the
-        input dimensions (rounded up), an explicit software default because the
-        manuscript defines :math:`k_f` as user supplied.
+        Compatibility parameter for the full CNFI list size. Use ``None``
+        (all input features) or the total number of input features. A smaller
+        value is rejected because the two branches must score the same full
+        feature set; it does not control the final output size.
     alpha:
         Fusion balance between CNFI and NMI. The manuscript default is 0.5.
     min_support, min_confidence:
@@ -53,8 +54,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         Logistic modulation parameters from Eq. (8).
     edge_aggregation:
         Deterministic reduction when several bin-level rules map to the same
-        feature pair. The manuscript does not specify this reduction; ``max``
-        retains the strongest rule and is the documented repository default.
+        feature pair. ``max`` retains the strongest rule, matching the
+        manuscript and the repository default.
     target_col:
         Optional compatibility convenience. When ``y`` is omitted in ``fit``,
         this column is removed from ``X`` and used as the target.
@@ -114,31 +115,25 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         self.n_features_in_ = len(self.feature_names_in_)
 
         self._validate_parameters(self.n_features_in_)
-        kf = self.cnfi_features
-        if kf is None:
-            kf = max(1, math.ceil(self.n_features_in_ / 2))
-
         discretized = self._equal_frequency_binning(X_features)
         self.graph_, self.rules_, raw_cnfi = self._fit_cnfi(discretized)
 
         cnfi_order = self._descending_order(raw_cnfi, self.feature_names_in_)
-        self.cnfi_features_ = cnfi_order[:kf]
+        self.cnfi_features_ = cnfi_order
         self.cnfi_scores_ = self._rank_scores(self.cnfi_features_)
 
-        remaining = [
-            name for name in self.feature_names_in_ if name not in self.cnfi_scores_
-        ]
         self.nmi_values_ = {
-            name: self._geometric_nmi(X_features[name], target) for name in remaining
+            name: self._geometric_nmi(X_features[name], target)
+            for name in self.feature_names_in_
         }
-        nmi_order = self._descending_order(self.nmi_values_, remaining)
+        nmi_order = self._descending_order(self.nmi_values_, self.feature_names_in_)
         self.nmi_features_ = nmi_order
         self.nmi_scores_ = self._rank_scores(nmi_order)
 
         self.feature_scores_ = {
             name: (
-                self.alpha * self.cnfi_scores_.get(name, 0.0)
-                + (1.0 - self.alpha) * self.nmi_scores_.get(name, 0.0)
+                self.alpha * self.cnfi_scores_[name]
+                + (1.0 - self.alpha) * self.nmi_scores_[name]
             )
             for name in self.feature_names_in_
         }
@@ -216,9 +211,11 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             raise ValueError("max_iter and tol must be positive.")
         if self.edge_aggregation not in {"max", "mean", "sum"}:
             raise ValueError("edge_aggregation must be max, mean, or sum.")
-        if self.cnfi_features is not None and not 1 <= self.cnfi_features <= n_features:
+        if self.cnfi_features is not None and self.cnfi_features != n_features:
             raise ValueError(
-                "cnfi_features must be between 1 and the number of features."
+                "cnfi_features must be None or the total number of input features; "
+                "both branches rank all inputs. Use n_features_to_select for "
+                "the final output size."
             )
         if self.n_features_to_select is not None and not (
             1 <= self.n_features_to_select <= n_features

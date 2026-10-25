@@ -21,9 +21,11 @@ CNFI-NMI ranks tabular features by combining two complementary signals:
 1. **CNFI** mines pairwise association rules, fuses Confidence, Lift, Support,
    Conviction, and Leverage with adaptive weights, builds a weighted directed
    feature network, and applies Eigen-Rank.
-2. **NMI** measures scale-normalized feature-target relevance for features not
-   selected by CNFI.
-3. **Rank fusion** combines both disjoint rankings with alpha = 0.5 by default.
+2. **NMI** measures scale-normalized feature-target relevance for every input
+   feature, independently of the CNFI ranking.
+3. **Rank fusion** matches both full rankings by feature identity and combines
+   their normalized rank scores with alpha = 0.5 by default. Only then are the
+   requested top features retained.
 
 The maintained implementation follows Eqs. (1)-(29), exposes intermediate
 rules/graphs/scores for audit, and is compatible with scikit-learn pipelines.
@@ -54,7 +56,6 @@ y = X.pop("target")
 
 selector = CNFINMISelector(
     n_features_to_select=12,  # paper's optional k_max
-    cnfi_features=6,          # paper's user-specified k_f
     alpha=0.5,
     min_support=0.01,
     min_confidence=0.1,
