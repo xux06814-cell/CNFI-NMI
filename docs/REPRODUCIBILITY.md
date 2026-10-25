@@ -32,7 +32,6 @@ python scripts/run_experiment.py \
   --csv data/raw/bank-full.csv \
   --target y \
   --features 12 \
-  --cnfi-features 6 \
   --output results/bank.json
 ```
 

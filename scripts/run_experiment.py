@@ -27,7 +27,11 @@ def parse_args():
     parser.add_argument("--csv", type=Path, required=True)
     parser.add_argument("--target", required=True)
     parser.add_argument("--features", type=int, default=12)
-    parser.add_argument("--cnfi-features", type=int, required=True)
+    parser.add_argument(
+        "--cnfi-features", type=int, default=None,
+        help="Compatibility option: must equal the total input feature count; "
+             "both branches evaluate all inputs. --features controls final retention.",
+    )
     parser.add_argument("--output", type=Path)
     parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()

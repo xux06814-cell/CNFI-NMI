@@ -24,7 +24,6 @@ y = pd.Series(target, name="major_incident")
 
 selector = CNFINMISelector(
     n_features_to_select=2,
-    cnfi_features=3,
     alpha=0.5,
     min_support=0.01,
     min_confidence=0.1,
