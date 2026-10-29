@@ -7,7 +7,7 @@ copies under `data/raw/`; this directory is ignored by Git.
 
 | Domain | Manuscript description | Expected target | Reported dimensions |
 |---|---|---|---|
-| Transportation | Sydney Traffic Incident Dataset, Jan. 2017-Jul. 2022 | `Is Major Incident` | 87 features |
+| Transportation | Sydney Traffic Incident Dataset, Jan. 2017-Jul. 2022 | `emergency service ` | 87 features |
 | Medical | Cardiovascular Disease Dataset | dataset-specific binary label | 68,205 rows, 15 features after preprocessing |
 | Financial | UCI Bank Marketing | `y` | 45,211 rows, 16 features |
 
