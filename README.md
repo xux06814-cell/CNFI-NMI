@@ -86,7 +86,7 @@ artifacts are added. See [the protocol](docs/REPRODUCIBILITY.md) and
 ```text
 src/cnfi_nmi/       maintained selector implementation
 tests/              equation and API regression tests
-scripts/            leakage-safe five-fold experiment runner
+scripts/            five-fold runner (outer test held out; see tuning caveat)
 examples/           synthetic quick start
 docs/               method mapping and reproducibility protocol
 paper/              manuscript provenance and availability notice
