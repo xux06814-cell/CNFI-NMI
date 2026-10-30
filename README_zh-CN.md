@@ -51,14 +51,14 @@ python examples/quickstart.py
 PDF 没有包含三套原始数据的精确归档、哈希、完整预处理脚本、折划分种子
 及完整 LightGBM 搜索网格，因此仓库暂不声称能够逐点还原论文全部数值图表。
 复现前须按照 [数据清单](data/README.md) 补齐来源和校验信息，再使用
-`scripts/run_experiment.py` 在每个训练折内部完成特征选择和调参，避免数据泄漏。
+`scripts/run_experiment.py` 保留外层测试折；特征选择在整个外层训练折上完成后才进行内层调参，因此内层验证并非完全嵌套，详见 `docs/REPRODUCIBILITY.md`。
 
 ## 目录结构
 
 ```text
 src/cnfi_nmi/       维护中的论文算法实现
 tests/              公式与接口回归测试
-scripts/            无泄漏的五折 LightGBM 实验脚本
+scripts/            五折 LightGBM 实验脚本（内层调参限制见文档）
 examples/           可直接运行的合成数据示例
 docs/               方法映射与严格复现规范
 paper/              论文来源与获取说明
