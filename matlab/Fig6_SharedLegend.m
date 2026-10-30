@@ -1,8 +1,11 @@
 
 clear; clc; close all;
-% Resolve data relative to this script, independent of MATLAB's current folder.
-script_dir = fileparts(mfilename('fullpath'));
-cd(script_dir);
+% Read only the experiment results explicitly selected by the user.
+result_root = getenv('CNFI_RESULTS_DIR');
+if isempty(result_root) || ~isfolder(result_root)
+    error('Set CNFI_RESULTS_DIR to your experiment result root.');
+end
+cd(result_root);
 
 
 FIG_W = 7.94;   % 英寸（A4 竖版宽）

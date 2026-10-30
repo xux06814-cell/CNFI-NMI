@@ -1,64 +1,53 @@
-# Reproducibility protocol
+# Experiment settings
 
-## Environment
+## Installation
 
-Use Python 3.10 or newer. A clean environment is recommended:
+Use Python 3.10 or newer:
 
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
-python -m pip install --upgrade pip
 python -m pip install -e ".[experiments,test]"
 pytest
 ```
 
-The manuscript reports Python 3.8, PyTorch, scikit-learn, LightGBM, five-fold
-cross-validation, five equal-frequency bins, minimum support 0.01, minimum
-confidence 0.1, and alpha 0.5. Python 3.8 is preserved as historical metadata;
-the maintained package targets supported Python releases from 3.10 onward.
+## Inputs and evaluation
 
-## Leakage control
-
-Feature encoding, CNFI-NMI fitting, and model tuning must be learned from the
-training fold only. `scripts/run_experiment.py` holds out the outer test fold,
-but currently fits encoding and feature selection once on the complete outer
-training fold before inner grid search. Inner validation scores therefore are
-not fully nested. Put preprocessing and selection inside the inner estimator
-when evaluating hyperparameters. The outer test fold remains held out.
-
-Example:
+Supply your processed comma-separated CSV and target column:
 
 ```bash
-python scripts/run_experiment.py \
-  --csv data/raw/bank-full.csv \
-  --target y \
-  --features 12 \
-  --output results/bank.json
+python scripts/run_experiment.py --csv path/to/processed.csv --target target --features 12 --seed 42 --output results/evaluation.json
 ```
 
-## What can and cannot currently be reproduced
+The script uses stratified five-fold outer evaluation and three-fold inner
+LightGBM grid search. Encoding and feature selection are fitted on the entire
+outer training fold before inner search; inner validation is not fully nested.
+The outer test fold is held out.
 
-The algorithm, equations, fixed priors, and synthetic example are executable
-and tested. The outer evaluation holds out the test fold; the inner tuning
-limitation above must be considered. The exact numerical figures in
-the paper are not claimed as reproduced by this repository revision because
-the exact raw dataset archives, checksums, preprocessing scripts, fold seeds,
-and complete LightGBM grids were not embedded in the supplied manuscript or
-the original repository. Publishing guessed substitutes would weaken, rather
-than improve, scientific reproducibility.
+| Setting | Value |
+|---|---|
+| Support / confidence | 0.01 / 0.1 |
+| CNFI bins | 5 equal-frequency bins for continuous inputs |
+| Alpha | 0.5 |
+| Kappa / theta | 1.0 / 0.0 |
+| Learning-rate grid | 0.01, 0.05, 0.1 |
+| Maximum-depth grid | 3, 5, 7 |
+| Trees | 200 |
+| Default seed | 42 |
 
-To make the numerical claims fully reproducible, the authors should add the
-items listed in `data/README.md`, then commit immutable result JSON files and a
-script that regenerates every table and figure from those files.
+The runner saves per-fold feature selections, classifier parameters and metrics,
+plus the mean and sample standard deviation across folds. Its grid and seed
+are the repository defaults; the manuscript's complete grid and original fold
+assignments are not available. Exact numerical reproduction remains unverified.
 
-## Reporting checklist
+See [dataset inputs](../data/README.md) for target definitions, and
+[figure instructions](FIGURES_AND_SENSITIVITY.md) for the separate alpha sweep.
+Record the input hash, environment versions and command alongside each run.
+The manuscript's medical and financial literature comparators retain their
+original datasets and classifiers.
 
-- Record package versions and operating system.
-- Record raw-data URLs, access dates, licenses, and SHA-256 hashes.
-- Fix and report all random seeds.
-- Preserve per-fold selected features, model parameters, and metrics.
-- Report mean and sample standard deviation over the five outer folds.
-- Separate exploratory parameter tuning from final confirmatory evaluation.
-- Do not compare newly generated metrics with the paper unless the dataset and
-  preprocessing hashes match.
+## Tests
+
+Unit tests use fixed fixtures to check equations and API behavior. They do not
+produce dataset benchmark results.
