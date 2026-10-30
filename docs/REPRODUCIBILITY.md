@@ -21,9 +21,11 @@ the maintained package targets supported Python releases from 3.10 onward.
 ## Leakage control
 
 Feature encoding, CNFI-NMI fitting, and model tuning must be learned from the
-training fold only. `scripts/run_experiment.py` implements a stratified outer
-five-fold evaluation and a three-fold inner grid search. Test-fold data are
-never used to choose features or classifier hyperparameters.
+training fold only. `scripts/run_experiment.py` holds out the outer test fold,
+but currently fits encoding and feature selection once on the complete outer
+training fold before inner grid search. Inner validation scores therefore are
+not fully nested. Put preprocessing and selection inside the inner estimator
+when evaluating hyperparameters. The outer test fold remains held out.
 
 Example:
 
@@ -37,8 +39,9 @@ python scripts/run_experiment.py \
 
 ## What can and cannot currently be reproduced
 
-The algorithm, equations, fixed priors, synthetic example, and leakage-safe
-evaluation protocol are executable and tested. The exact numerical figures in
+The algorithm, equations, fixed priors, and synthetic example are executable
+and tested. The outer evaluation holds out the test fold; the inner tuning
+limitation above must be considered. The exact numerical figures in
 the paper are not claimed as reproduced by this repository revision because
 the exact raw dataset archives, checksums, preprocessing scripts, fold seeds,
 and complete LightGBM grids were not embedded in the supplied manuscript or

@@ -81,12 +81,20 @@ artifacts are added. See [the protocol](docs/REPRODUCIBILITY.md) and
 
 ![Feature interaction networks reproduced from Figure 6 of the accepted manuscript](docs/assets/feature-networks.png)
 
+## Sensitivity analysis and MATLAB figures
+
+See [Figure 5 sensitivity and Figure 6 visualization](docs/FIGURES_AND_SENSITIVITY.md)
+for the alpha-sweep command, per-fold measurements, mean and sample SD exports,
+and MATLAB plotting instructions. These scripts report exploratory runs from
+user-supplied data; exact manuscript numerical reproduction remains unverified.
+
 ## Repository layout
 
 ```text
 src/cnfi_nmi/       maintained selector implementation
 tests/              equation and API regression tests
-scripts/            five-fold runner (outer test held out; see tuning caveat)
+scripts/            five-fold evaluation and exploratory alpha sweep
+matlab/             figures generated from supplied measured CSV results
 examples/           synthetic quick start
 docs/               method mapping and reproducibility protocol
 paper/              manuscript provenance and availability notice
