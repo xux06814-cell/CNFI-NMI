@@ -1,4 +1,4 @@
-"""Leakage-safe five-fold LightGBM evaluation for a user-supplied CSV file."""
+"""Five-fold outer evaluation; inner tuning is not fully nested (see docs)."""
 
 from __future__ import annotations
 
@@ -134,7 +134,7 @@ def main():
         for metric in metrics
     }
     result = {
-        "protocol": "nested leakage-safe 5-fold CV",
+        "protocol": "5-fold outer holdout; inner tuning is not fully nested",
         "folds": folds,
         "summary": summary,
     }
