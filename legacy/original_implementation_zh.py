@@ -261,22 +261,5 @@ class CNFI_NMI_Selector(BaseEstimator, TransformerMixin):
             final_scores[f] = self.alpha * s_c + (1 - self.alpha) * s_n
         return final_scores
 
-# -----------------------------------------------------------
-# 使用示例 (Usage Example)
-# -----------------------------------------------------------
 if __name__ == "__main__":
-    # 生成模拟数据
-    X_dummy = pd.DataFrame(np.random.rand(200, 20), columns=[f'feat_{i}' for i in range(20)])
-    y_dummy = np.random.randint(0, 2, 200)
-    
-    # 初始化选择器
-    selector = CNFI_NMI_Selector(target_col='target', n_features=5, n_bins=5)
-    
-    # 拟合
-    selector.fit(X_dummy, pd.Series(y_dummy, name='target'))
-    
-    # 输出结果
-    print("Selected Features:", selector.selected_features_)
-    print("Feature Scores (Top 5):")
-    for f in selector.selected_features_:
-        print(f"{f}: {selector.feature_scores_[f]:.4f}")
+    raise SystemExit("Run examples/quickstart.py with your processed CSV; see README.md.")

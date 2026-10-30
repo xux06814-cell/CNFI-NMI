@@ -1,6 +1,6 @@
-# Legacy snapshot
+# Legacy implementation
 
-These two files preserve the repository's original single-file implementation
-as committed before the reproducibility-oriented rewrite. They are retained for
-auditability only and contain known deviations from the accepted manuscript.
-Use the maintained package under `src/cnfi_nmi/` for analysis.
+These files retain the original algorithm implementation for reference.
+The random-data demonstration entry point has been removed; the complete
+historical snapshot remains available in Git history. For current analysis,
+use `src/cnfi_nmi/` and the CSV-based example in `examples/quickstart.py`.

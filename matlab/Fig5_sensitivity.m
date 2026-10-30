@@ -1,7 +1,9 @@
 % Each folder must contain sensitivity_stats.csv from run_alpha_sensitivity.py.
 % Shaded regions show mean +/- sample SD across validation folds, not CI.
 clear; close all; clc;
-root=fileparts(mfilename('fullpath')); cd(root);
+root=getenv('CNFI_RESULTS_DIR');
+if isempty(root) || ~isfolder(root),error('Set CNFI_RESULTS_DIR to your experiment result root.');end
+cd(root);
 folders={'Traffic Dataset','Financial Dataset','Medical Dateset'};
 labels={'Traffic','Financial','Medical'}; metrics={'accuracy','f1','precision','recall','specificity','auc'};
 names={'Accuracy','F1-Score','Precision','Recall','Specificity','AUC'};
