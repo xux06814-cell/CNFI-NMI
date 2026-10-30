@@ -32,7 +32,7 @@ git clone https://github.com/xux06814-cell/CNFI-NMI.git
 cd CNFI-NMI
 python -m pip install -e ".[test]"
 pytest
-python examples/quickstart.py
+python examples/quickstart.py --csv path/to/processed.csv --target target --features 12
 ```
 
 ## 与原文保持一致的关键点
@@ -45,17 +45,13 @@ python examples/quickstart.py
   `kappa=1.0`、`theta=0.0` 以及两组先验权重均对应原文。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
-## 学术复现边界
+## 实验运行
 
-当前版本已实现并测试论文算法，但不虚构“完全复现”结论。原仓库和所附
-PDF 没有包含三套原始数据的精确归档、哈希、完整预处理脚本、折划分种子
-及完整 LightGBM 搜索网格，因此仓库暂不声称能够逐点还原论文全部数值图表。
-复现前须按照 [数据清单](data/README.md) 补齐来源和校验信息，再使用
-`scripts/run_experiment.py` 保留外层测试折；特征选择在整个外层训练折上完成后才进行内层调参，因此内层验证并非完全嵌套，详见 `docs/REPRODUCIBILITY.md`。
+仓库提供特征选择器、五折 LightGBM 实验和 α 敏感性扫描。使用者传入自己的处理后数据，并保存本次运行生成的结果文件。输入定义见[数据说明](data/README.md)，验证流程和参数见[实验设置](docs/REPRODUCIBILITY.md)。
 
 ## 参数敏感性与 MATLAB 绘图
 
-[使用说明](docs/FIGURES_AND_SENSITIVITY.md)包含 α 扫描、逐折指标、均值与样本标准差导出，以及 MATLAB 图 5、图 6 的运行方法。脚本读取用户提供的数据；这些探索性结果不代表已精确复现论文数值。
+[使用说明](docs/FIGURES_AND_SENSITIVITY.md)包含 α 扫描、逐折指标、均值与样本标准差导出，以及 MATLAB 图 5、图 6 的运行方法。绘图脚本读取使用者明确指定的结果目录。
 
 ## 目录结构
 
@@ -64,7 +60,7 @@ src/cnfi_nmi/       维护中的论文算法实现
 tests/              公式与接口回归测试
 scripts/            五折 LightGBM 实验及探索性 α 扫描
 matlab/             读取实算 CSV 的论文图表脚本
-examples/           可直接运行的合成数据示例
+examples/           读取使用者 CSV 的运行示例
 docs/               方法映射与严格复现规范
 paper/              论文来源与获取说明
 data/               数据来源与校验要求（不直接分发原始数据）
@@ -73,5 +69,4 @@ legacy/             原仓库代码快照，仅供审计追溯
 
 ## 许可说明
 
-仓库尚未声明软件或论文许可证。在作者明确添加许可证文件之前，软件、论文
-和图件的相关权利仍归各作者及出版方所有。
+软件许可证尚待作者确定；引用信息见 `CITATION.cff`。

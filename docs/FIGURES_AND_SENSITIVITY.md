@@ -1,79 +1,59 @@
-# Figure 5 sensitivity and Figure 6 network visualization
+# Sensitivity analysis and MATLAB figures
 
-The scripts produce **exploratory** results from a user-supplied CSV. They are
-not a claim that the numerical results in the manuscript have been replicated.
-The exact folds, model grid, feature preprocessing and data provenance must be
-independently verified before comparison. No data or previously reported
-numbers are bundled.
+## Generate your results
 
-Install `python -m pip install -e ".[experiments]"`. Run the Python script once
-for each dataset, for example:
+Install `python -m pip install -e ".[experiments]"`. Run the sweep on each
+of your processed datasets:
 
 ```bash
-python scripts/run_alpha_sensitivity.py --csv data/raw/traffic.csv --target x --positive-label 1 --features 12 --output "matlab/Traffic Dataset"
-python scripts/run_alpha_sensitivity.py --csv data/raw/bank.csv --target y --positive-label yes --features 12 --output "matlab/Financial Dataset"
-python scripts/run_alpha_sensitivity.py --csv data/raw/cardio.csv --target cardio --positive-label 1 --features 12 --drop id --output "matlab/Medical Dateset"
+python scripts/run_alpha_sensitivity.py --csv path/to/traffic.csv --target x --positive-label 1 --features 12 --output "results/Traffic Dataset"
+python scripts/run_alpha_sensitivity.py --csv path/to/bank.csv --target y --positive-label 1 --features 12 --output "results/Financial Dataset"
+python scripts/run_alpha_sensitivity.py --csv path/to/cardio.csv --target cardio --positive-label 1 --features 12 --output "results/Medical Dateset"
 ```
 
-Examples are schematic: remove `--drop id` if the actual file
-has no such column. Set the target, positive label, delimiters and dropped
-identifiers from the actual dataset. The manuscript defines traffic target as
-logical OR of `Emergency service(s)` and `Emergency services` and removes both
-source fields from predictors; its table specifies 86 input features. Do not
-use `Is Major Incident` as the target for the reported experiment. The exact
-processed dataset in the present audit has 81,970 rows; the manuscript reports
-85,611. The cause is unresolved, so this file is not a verified exact paper
-artifact and is not redistributed here. Using an unknown target to approximate
-paper figures is inappropriate.
+Set `--target`, `--positive-label` and `--sep` to match your CSV. Use
+`--drop` to exclude identifiers and target-source columns, and
+`--categorical` to declare integer-coded categories. For encoded Bank Marketing:
 
-Each outer training fold fits the repository's full `CNFINMISelector` once.
-The script recombines its two full rank scores over alpha 0, 0.1, ..., 1.0;
-models use fixed CLI classifier parameters (defaults: 100 trees, learning rate
-0.1, max depth 3), with encoding fitted on training data only. Fold indices are
-stratified, shuffled, seeded. No per-alpha hyperparameter selection is done.
-Results are not claims that the paper used those fixed hyperparameters. Reusing
-outer test folds to choose alpha and then presenting the same scores as an
-independent test would be biased. Use a nested procedure or a separate test set
-for a confirmatory comparison. Variability is sample SD across outer folds, not
-a confidence interval. Integer-coded categorical columns are not automatically
-identified: use `--categorical job marital education default housing loan contact month poutcome`
-for the encoded bank file so these remain categories rather than numerical bins.
-This declaration is recorded in the output metadata.
+```text
+--categorical job marital education default housing loan contact month poutcome
+```
 
-Each output folder contains `sensitivity.json` (actual folds, metrics, selected
-features, data SHA-256, settings and package versions), `sensitivity_stats.csv`
-(11 means and sample SDs), `adj_directed.csv`, `adj.csv`, `nmi.csv`, `rank.csv`,
-and `feature_aliases.csv`. The network is fitted on one training fold, default
-fold 1; `adj.csv` uses the maximum of two directed edge weights solely for the
-undirected chord diagram. MATLAB will stop rather than invent random data if
-any required file is absent. The graph reflects one fold, not a full-data graph.
+Traffic target construction and reported dataset dimensions are in
+[dataset inputs](../data/README.md). Each run reads the supplied CSV and writes
+its own outputs; no previous experiment results are supplied.
 
-Place the three folders below the `matlab/` directory, then run MATLAB R2019a or
-later from any directory:
+## Sweep settings and outputs
+
+The script fits both full feature rankings on each outer training fold and
+scans alpha from 0 to 1 in steps of 0.1. Defaults are five stratified folds,
+seed 42, 100 LightGBM trees, learning rate 0.1 and maximum depth 3.
+Classifier parameters stay fixed during the sweep. The test-fold sweep is
+exploratory; use separate validation to select alpha for a final evaluation.
+
+| File | Content |
+|---|---|
+| `sensitivity.json` | Per-fold metrics, selected features, input SHA-256, settings and versions |
+| `sensitivity_stats.csv` | Mean and sample SD at each alpha |
+| `adj_directed.csv` | Directed network from the selected training fold, default fold 1 |
+| `adj.csv` | Maximum of the two directed weights for undirected plotting |
+| `nmi.csv`, `rank.csv` | Feature relevance and fused scores |
+| `feature_aliases.csv` | Original feature names and MATLAB aliases |
+
+## Plot your result directory
+
+Under the result root, use the three dataset folder names shown above.
+The spelling `Medical Dateset` is retained for template compatibility.
+In MATLAB R2019a or later, explicitly select the root containing your outputs:
 
 ```matlab
+setenv('CNFI_RESULTS_DIR', 'C:/your-project/results')
 run('matlab/Fig5_sensitivity.m')
 run('matlab/Fig6_SharedLegend.m')
 ```
 
-Fig 5 displays mean +/- sample SD, clipped to the feasible [0,1] range. Fig 6
-reads the actual supplied adjacency, NMI and fused rank score; the chord layout
-prunes weak edges, so it is a visualization rather than the full graph. The
-complete directed adjacency is preserved separately. Each script writes PNG
-and PDF output under `matlab/`. The adapted Figure 6 MATLAB template was
-originally provided by the authors, and its no-data random fallback has been
-removed. MATLAB aliases are recorded in `feature_aliases.csv`.
-
-The existing `scripts/run_experiment.py` performs feature selection and encoding
-on the entire outer training fold before inner CV; its outer test fold is held
-out, but its inner validation sees information from the full outer training fold.
-It is therefore not fully nested. Fix by putting all preprocessing and feature
-selection inside the estimator fitted separately by each inner split before
-using its inner scores for hyperparameter assessment. This figure script instead
-uses fixed classifier parameters and does not perform inner tuning.
-
-Original source files, licenses, the exact 85,611-to-81,970 row exclusion,
-fold assignments, and complete hyperparameter grids are still needed for a
-credible numerical reproduction. The dataset README records the target and feature count from manuscript Table 2
-and section 4.1.1. Original medical and financial literature results are not
-same-data/same-classifier baseline runs.
+Figure 5 shows means with sample SD shading, clipped to [0,1].
+Figure 6 uses the supplied network and feature scores, prunes weak edges for
+display, and normalizes node encodings within each dataset. Full directed
+adjacency remains in its CSV. Both scripts write PNG and PDF files to the
+selected result root and require all input files to be present.

@@ -6,20 +6,16 @@ from cnfi_nmi import CNFINMISelector
 
 
 def _sample_data(n=120):
-    rng = np.random.default_rng(7)
-    signal = rng.integers(0, 2, n)
-    partner = np.where(rng.random(n) < 0.9, signal, 1 - signal)
-    return (
-        pd.DataFrame(
-            {
-                "signal": signal,
-                "partner": partner,
-                "noise_a": rng.normal(size=n),
-                "noise_b": rng.integers(0, 5, n),
-            }
-        ),
-        pd.Series(signal, name="target"),
-    )
+    # Fixed API fixture; not an experimental dataset.
+    rows = np.array([
+        [0, 0, 0.1, 0], [0, 0, 0.5, 1], [0, 0, 0.9, 2],
+        [0, 0, 0.3, 3], [0, 1, 0.7, 4], [0, 0, 0.2, 0],
+        [1, 1, 0.4, 1], [1, 1, 0.8, 2], [1, 1, 0.6, 3],
+        [1, 0, 1.0, 4], [1, 1, 0.0, 0], [1, 1, 1.1, 1],
+    ])
+    data = np.tile(rows, (int(np.ceil(n / len(rows))), 1))[:n]
+    X = pd.DataFrame(data, columns=["signal", "partner", "noise_a", "noise_b"])
+    return X, pd.Series(data[:, 0].astype(int), name="target")
 
 
 def test_rank_normalization_matches_equations_27_and_28():
