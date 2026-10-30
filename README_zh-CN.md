@@ -53,12 +53,17 @@ PDF 没有包含三套原始数据的精确归档、哈希、完整预处理脚�
 复现前须按照 [数据清单](data/README.md) 补齐来源和校验信息，再使用
 `scripts/run_experiment.py` 保留外层测试折；特征选择在整个外层训练折上完成后才进行内层调参，因此内层验证并非完全嵌套，详见 `docs/REPRODUCIBILITY.md`。
 
+## 参数敏感性与 MATLAB 绘图
+
+[使用说明](docs/FIGURES_AND_SENSITIVITY.md)包含 α 扫描、逐折指标、均值与样本标准差导出，以及 MATLAB 图 5、图 6 的运行方法。脚本读取用户提供的数据；这些探索性结果不代表已精确复现论文数值。
+
 ## 目录结构
 
 ```text
 src/cnfi_nmi/       维护中的论文算法实现
 tests/              公式与接口回归测试
-scripts/            五折 LightGBM 实验脚本（内层调参限制见文档）
+scripts/            五折 LightGBM 实验及探索性 α 扫描
+matlab/             读取实算 CSV 的论文图表脚本
 examples/           可直接运行的合成数据示例
 docs/               方法映射与严格复现规范
 paper/              论文来源与获取说明
