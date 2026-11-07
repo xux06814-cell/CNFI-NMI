@@ -36,9 +36,12 @@ does not introduce another threshold variable or change the fixed FP-Growth
 support and confidence filters.
 
 Rank scores use `(d - rank) / (d - 1)` for `d > 1` and zero for a single
-feature. The optional `graph_mode="normalized"` implements the revised
-normalized extension; it was not used in the reported benchmark. The default
-`graph_mode="benchmark"` retains the reported raw metrics and spectral operator.
+feature. The revised normalized formulation, enabled with
+`graph_mode="normalized"`, has been evaluated. This mode min-max scales the
+five rule metrics and uses the column-stochastic augmented operator with lazy
+power iteration. The default `graph_mode="benchmark"` retains the raw-metric
+spectral implementation. Select the mode explicitly when configuring an
+experiment; see [evaluation status and graph modes](docs/REPRODUCIBILITY.md#evaluation-status-and-graph-modes).
 Empirical NMI can be inflated for high-cardinality features.
 
 ## Installation

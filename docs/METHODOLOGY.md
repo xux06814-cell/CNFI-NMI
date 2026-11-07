@@ -87,10 +87,11 @@ pair by taking the maximum rule weight. This is the implementation default
 sensitivity analysis.
 
 
-## Normalized extension (not part of the reported benchmark)
+## Evaluated normalized formulation
 
-Set `graph_mode="normalized"` to use the revised manuscript's optional
-extension. Each of the five rule metrics is min-max scaled across qualifying
+Set `graph_mode="normalized"` to use the revised manuscript's normalized
+formulation, which has been evaluated as confirmed by the authors. Each of the
+five rule metrics is min-max scaled across qualifying
 training rules (a constant metric contributes zero), while the modulation
 coefficient still uses raw Lift. Rule weights are the adaptive weighted sum
 of scaled metrics, and feature-pair edges use the maximum. Zero-weight edges
@@ -98,6 +99,10 @@ are omitted from the scaled graph. A smoothed in-degree distribution supplies
 dangling transitions and the auxiliary column of a column-stochastic matrix.
 The stationary vector is estimated by lazy power iteration, `(I + Q)/2`;
 `rho` defaults to 0.85 and must lie strictly between 0 and 1. Empty graphs
-produce tied zero scores. This extension has not been evaluated in the
-reported experiments; the default `graph_mode="benchmark"` retains raw rule
-metrics and the augmented spectral operator used for those experiments.
+produce tied zero scores.
+
+The default `graph_mode="benchmark"` retains raw rule metrics and its augmented
+spectral operator. The default mode does not indicate the evaluation status of
+the normalized formulation. Configure the graph mode explicitly for each
+experiment and record it with the results; see
+[evaluation status and graph modes](REPRODUCIBILITY.md#evaluation-status-and-graph-modes).

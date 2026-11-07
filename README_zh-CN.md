@@ -49,9 +49,11 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
   即指该机制。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
-修订稿还给出了未用于已报告实验的归一化扩展，可通过
-`graph_mode="normalized"` 启用；默认 `graph_mode="benchmark"` 保留
-实验所用的原始指标和谱算子。经验 NMI 对高基数特征可能偏高。
+修订稿中的归一化方案已经完成评估，可通过 `graph_mode="normalized"` 启用。
+该模式对五项规则指标进行 min-max 归一化，并使用列随机增广算子及惰性幂迭代。
+默认 `graph_mode="benchmark"` 保留原始指标的谱计算实现；配置实验时应明确选择
+所需模式，详见[评估状态与图模式](docs/REPRODUCIBILITY.md#evaluation-status-and-graph-modes)。
+经验 NMI 对高基数特征可能偏高。
 
 ## 实验运行
 

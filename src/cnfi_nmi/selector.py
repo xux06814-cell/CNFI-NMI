@@ -59,8 +59,9 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         feature pair. ``max`` retains the strongest rule, matching the
         manuscript and the repository default.
     graph_mode:
-        ``benchmark`` uses the reported raw metrics and spectral operator;
-        ``normalized`` enables the unevaluated normalized extension.
+        ``benchmark`` retains raw rule metrics and the spectral operator;
+        ``normalized`` enables the evaluated normalized formulation described
+        in the revised manuscript. Select the mode explicitly for experiments.
     target_col:
         Optional compatibility convenience. When ``y`` is omitted in ``fit``,
         this column is removed from ``X`` and used as the target.
