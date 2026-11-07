@@ -47,6 +47,35 @@ Record the input hash, environment versions and command alongside each run.
 The manuscript's medical and financial literature comparators retain their
 original datasets and classifiers.
 
+## Evaluation status and graph modes
+
+The authors confirm that the revised normalized formulation has been evaluated.
+Earlier repository statements describing it as unevaluated are outdated.
+
+The selector exposes two graph modes:
+
+| Mode | Rule metrics and graph operator |
+|---|---|
+| `normalized` | Min-max scaled rule metrics; column-stochastic augmented operator and lazy power iteration, as described in the revised manuscript |
+| `benchmark` (API default) | Raw rule metrics and the retained augmented spectral implementation |
+
+Select the evaluated normalized formulation explicitly when constructing the
+selector:
+
+```python
+selector = CNFINMISelector(
+    n_features_to_select=12,
+    graph_mode="normalized",
+)
+```
+
+The current experiment and alpha-sensitivity scripts instantiate the selector
+with its default graph mode. To run the normalized formulation through those
+scripts, set `graph_mode="normalized"` in their selector construction. Record
+the graph mode, code revision, processed-data hash, fold assignments and metrics
+with each run. The numerical-reproduction limitations described above still
+apply to the materials currently distributed in this repository.
+
 ## Tests
 
 Unit tests use fixed fixtures to check equations and API behavior. They do not
