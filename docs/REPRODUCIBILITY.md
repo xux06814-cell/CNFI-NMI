@@ -1,8 +1,8 @@
 # Experiment settings
 
-## Installation
+## Installation and environment
 
-Use Python 3.10 or newer:
+The maintained package requires Python 3.10 or newer. The manuscript reports Python 3.8, PyTorch and scikit-learn (p. 10); this is a maintained reimplementation, not an exact reconstruction of that environment. The selector does not require PyTorch.
 
 ```bash
 python -m venv .venv
@@ -12,71 +12,50 @@ python -m pip install -e ".[experiments,test]"
 pytest
 ```
 
-## Inputs and evaluation
+## Inputs and outer evaluation
 
-Supply your processed comma-separated CSV and target column:
+Supply your processed CSV, target and exact positive-class label:
 
 ```bash
-python scripts/run_experiment.py --csv path/to/processed.csv --target target --features 12 --seed 42 --output results/evaluation.json
+python scripts/run_experiment.py --csv path/to/processed.csv --target target --positive-label 1 --features 12 --seed 42 --output results/evaluation.json
 ```
 
-The script uses stratified five-fold outer evaluation and three-fold inner
-LightGBM grid search. Encoding and feature selection are fitted on the entire
-outer training fold before inner search; inner validation is not fully nested.
-The outer test fold is held out.
+Set `--sep`, `--drop` and `--categorical` for your schema. For example, declare integer-coded Bank Marketing categories:
 
-| Setting | Value |
-|---|---|
-| Support / confidence | 0.01 / 0.1 |
-| CNFI bins | 5 equal-frequency bins for continuous inputs |
-| Alpha | 0.5 |
-| Kappa / theta | 1.0 / 0.0 |
-| Learning-rate grid | 0.01, 0.05, 0.1 |
-| Maximum-depth grid | 3, 5, 7 |
-| Trees | 200 |
-| Default seed | 42 |
+```text
+--categorical job marital education default housing loan contact month poutcome
+```
 
-The runner saves per-fold feature selections, classifier parameters and metrics,
-plus the mean and sample standard deviation across folds. Its grid and seed
-are the repository defaults; the manuscript's complete grid and original fold
-assignments are not available. Exact numerical reproduction remains unverified.
+Exclude identifiers and target-source columns. Missing targets are rejected. The positive label is required so precision, recall, F1, specificity and AUC consistently refer to the intended event.
 
-See [dataset inputs](../data/README.md) for target definitions, and
-[figure instructions](FIGURES_AND_SENSITIVITY.md) for the separate alpha sweep.
-Record the input hash, environment versions and command alongside each run.
-The manuscript's medical and financial literature comparators retain their
-original datasets and classifiers.
+The runner performs five stratified outer folds. Within each outer training fold, the selector sees original observations and category identities. CNFI alone discretizes continuous values; NMI uses original values. After selection, training-derived median filling and categorical encoding prepare selected columns for LightGBM; unknown test categories receive -1. An all-missing numeric training column receives a classifier-side fill of 0.
+
+Preprocessing and feature selection precede three-fold inner LightGBM search. This follows the disclosed ordering on p. 10: **inner tuning is not fully nested**, while each outer test fold remains held out. The code does not claim fully nested validation.
+
+| Setting | Value | Status |
+|---|---|---|
+| Graph mode | `normalized` | Paper Eqs. 7-22; default and explicit runner setting |
+| Support / confidence | .01 / .1 | Paper p. 10 |
+| CNFI bins | 5 equal-frequency | Paper p. 10 |
+| Alpha | .5 | Paper Eq. 31 |
+| Kappa / theta, priors | Table 1 | Fixed across datasets |
+| k_max | 12 by runner default; configurable | Paper gives 12 as an example; Table 5 uses 4 |
+| Learning-rate grid | .01, .05, .1 | Repository grid within reported range |
+| Maximum-depth grid | 3, 5, 7 | Repository grid within reported range |
+| Trees | 200 | Repository choice; not specified in paper |
+| Seed / inner folds | 42 / 3 | Repository choices; not specified in paper |
+| Threads | 2; `--threads` configurable | Runtime choice, not a paper setting |
+
+Output JSON records graph mode, selector parameters, input SHA-256, positive label, schema declarations, software versions, positional train/test indices, per-fold feature selections, classifier parameters, metrics, means and sample SD (`ddof=1`). Save the code commit and exact command alongside it.
 
 ## Evaluation status and graph modes
 
-The authors confirm that the revised normalized formulation has been evaluated.
-Earlier repository statements describing it as unevaluated are outdated.
+`normalized` implements the supplied paper and is the default. The explicit historical `benchmark` mode uses raw metrics and another spectral operator; it is retained for comparison and emits a warning. Both experiment scripts and quickstart explicitly use `normalized`.
 
-The selector exposes two graph modes:
+Formula tests and small CLI fixtures establish implementation consistency. They do **not** independently verify reported dataset scores. No processed benchmark inputs, original fold assignments, complete original grid or per-fold result archives are bundled. Previously stated author confirmations are not independent reproduction evidence.
 
-| Mode | Rule metrics and graph operator |
-|---|---|
-| `normalized` | Min-max scaled rule metrics; column-stochastic augmented operator and lazy power iteration, as described in the revised manuscript |
-| `benchmark` (API default) | Raw rule metrics and the retained augmented spectral implementation |
+The main runner evaluates CNFI-NMI. It does not recreate PGI-SDMI, SDMI, MFS, PSO or Table 5 component ablations. Alpha=0/1 in the sweep covers pure NMI/CNFI endpoints, but not those other methods. Their full specifications and measured outputs are required before claiming table/figure reproduction.
 
-Select the evaluated normalized formulation explicitly when constructing the
-selector:
+The paper says LightGBM is unified for tests while also describing literature comparators named for other learners. The repository does not resolve that ambiguity by inventing comparator implementations or settings.
 
-```python
-selector = CNFINMISelector(
-    n_features_to_select=12,
-    graph_mode="normalized",
-)
-```
-
-The current experiment and alpha-sensitivity scripts instantiate the selector
-with its default graph mode. To run the normalized formulation through those
-scripts, set `graph_mode="normalized"` in their selector construction. Record
-the graph mode, code revision, processed-data hash, fold assignments and metrics
-with each run. The numerical-reproduction limitations described above still
-apply to the materials currently distributed in this repository.
-
-## Tests
-
-Unit tests use fixed fixtures to check equations and API behavior. They do not
-produce dataset benchmark results.
+See [dataset provenance](../data/README.md), [figure/sweep instructions](FIGURES_AND_SENSITIVITY.md), and [the consistency audit](PAPER_CONSISTENCY_AUDIT_zh-CN.md).

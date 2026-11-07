@@ -18,7 +18,7 @@ def _sample_data(n=120):
     return X, pd.Series(data[:, 0].astype(int), name="target")
 
 
-def test_rank_normalization_matches_equations_27_and_28():
+def test_rank_normalization_matches_equations_29_and_30():
     scores = CNFINMISelector._rank_scores(["a", "b", "c"])
     assert scores == {"a": 1.0, "b": 0.5, "c": 0.0}
 
@@ -44,12 +44,14 @@ def test_fit_transform_exposes_auditable_outputs():
     assert rule["lambda"] == pytest.approx(expected_lambda)
     strong = np.array([0.40, 0.20, 0.10, 0.20, 0.10])
     weak = np.array([0.10, 0.20, 0.40, 0.10, 0.20])
-    metrics = rule[
-        ["confidence", "lift", "support", "conviction", "leverage"]
-    ].to_numpy(float)
+    columns = ["confidence", "lift", "support", "conviction", "leverage"]
+    metrics = selector.rules_[columns].to_numpy(float)
+    metrics = (metrics - metrics.min(axis=0)) / (
+        metrics.max(axis=0) - metrics.min(axis=0) + 1e-9
+    )
     expected_weight = (
         expected_lambda * strong + (1 - expected_lambda) * weak
-    ) @ metrics
+    ) @ metrics[0]
     assert rule["weight"] == pytest.approx(expected_weight)
 
 
@@ -131,7 +133,7 @@ def test_single_feature_rank_is_zero():
     assert CNFINMISelector._rank_scores(["only"]) == {"only": 0.0}
 
 
-def test_normalized_extension_weights_and_empty_graph():
+def test_paper_mode_weights_and_empty_graph():
     X, y = _sample_data()
     selector = CNFINMISelector(n_features_to_select=2, graph_mode="normalized").fit(X, y)
     assert selector.rules_["weight"].between(0, 1).all()
@@ -142,7 +144,7 @@ def test_normalized_extension_weights_and_empty_graph():
     assert selector._eigen_rank(graph) == {"a": 0.0, "b": 0.0}
 
 
-def test_normalized_extension_handles_dangling_node():
+def test_paper_mode_handles_dangling_node():
     import networkx as nx
     graph = nx.DiGraph()
     graph.add_nodes_from(["a", "b", "c"])

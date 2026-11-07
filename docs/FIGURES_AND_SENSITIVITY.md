@@ -25,7 +25,7 @@ its own outputs; no previous experiment results are supplied.
 
 ## Sweep settings and outputs
 
-The script fits both full feature rankings on each outer training fold and
+The script uses the manuscript `normalized` graph mode and fits both full feature rankings on each outer training fold and
 scans alpha from 0 to 1 in steps of 0.1. Defaults are five stratified folds,
 seed 42, 100 LightGBM trees, learning rate 0.1 and maximum depth 3.
 Classifier parameters stay fixed during the sweep. The test-fold sweep is
@@ -33,7 +33,7 @@ exploratory; use separate validation to select alpha for a final evaluation.
 
 | File | Content |
 |---|---|
-| `sensitivity.json` | Per-fold metrics, selected features, input SHA-256, settings and versions |
+| `sensitivity.json` | Per-fold metrics, selected features, fold indices, graph mode, input SHA-256, settings and versions |
 | `sensitivity_stats.csv` | Mean and sample SD at each alpha |
 | `adj_directed.csv` | Directed network from the selected training fold, default fold 1 |
 | `adj.csv` | Maximum of the two directed weights for undirected plotting |

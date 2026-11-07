@@ -6,7 +6,7 @@ and columns used directly to construct the target.
 
 | Domain | Dataset in the manuscript | Target | Reported dimensions |
 |---|---|---|---|
-| Traffic | Sydney Traffic Incident Dataset, Jan. 2017–July 2022 | OR of `Emergency service(s)` and `Emergency services` | 85,611 rows, 86 inputs |
+| Traffic | Sydney Traffic Incident Dataset, Jan. 2017–July 2022 | OR of `Emergency service(s)` and `Emergency services` | 86 inputs; row count not specified in the supplied paper |
 | Medical | Cardiovascular Disease Dataset | `cardio` | 68,205 rows, 15 inputs after excluding `id` and the target |
 | Financial | UCI Bank Marketing | `y` | 45,211 rows, 16 inputs |
 
