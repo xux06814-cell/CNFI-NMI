@@ -59,9 +59,9 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         feature pair. ``max`` retains the strongest rule, matching the
         manuscript and the repository default.
     graph_mode:
-        ``benchmark`` retains raw rule metrics and the spectral operator;
-        ``normalized`` enables the evaluated normalized formulation described
-        in the revised manuscript. Select the mode explicitly for experiments.
+        ``normalized`` (default) implements Eqs. 7-22 of the manuscript.
+        ``benchmark`` retains the historical raw-metric spectral variant for
+        comparison only; it is not the algorithm specified by this manuscript.
     target_col:
         Optional compatibility convenience. When ``y`` is omitted in ``fit``,
         this column is removed from ``X`` and used as the target.
@@ -69,7 +69,7 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
 
     def __init__(
         self,
-        n_features_to_select: int | None = 10,
+        n_features_to_select: int | None = None,
         cnfi_features: int | None = None,
         *,
         alpha: float = 0.5,
@@ -93,7 +93,7 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             0.20,
         ),
         edge_aggregation: Literal["max", "mean", "sum"] = "max",
-        graph_mode: Literal["benchmark", "normalized"] = "benchmark",
+        graph_mode: Literal["benchmark", "normalized"] = "normalized",
         rho: float = 0.85,
         epsilon: float = 1e-9,
         max_iter: int = 1000,
@@ -125,8 +125,17 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         self.n_features_in_ = len(self.feature_names_in_)
 
         self._validate_parameters(self.n_features_in_)
+        if self.graph_mode == "benchmark":
+            warnings.warn(
+                "graph_mode='benchmark' uses historical raw metrics and a "
+                "spectral operator that do not implement the supplied manuscript. "
+                "Use graph_mode='normalized' for paper-aligned results.",
+                UserWarning,
+                stacklevel=2,
+            )
         discretized = self._equal_frequency_binning(X_features)
         self.graph_, self.rules_, raw_cnfi = self._fit_cnfi(discretized)
+        self.cnfi_values_ = raw_cnfi
 
         cnfi_order = self._descending_order(raw_cnfi, self.feature_names_in_)
         self.cnfi_features_ = cnfi_order
@@ -224,7 +233,7 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         if not 0.0 < self.rho < 1.0:
             raise ValueError("rho must be strictly between 0 and 1.")
         if self.graph_mode == "normalized" and self.edge_aggregation != "max":
-            raise ValueError("The normalized extension requires max edge aggregation.")
+            raise ValueError("The manuscript's normalized mode requires max edge aggregation.")
         if self.edge_aggregation not in {"max", "mean", "sum"}:
             raise ValueError("edge_aggregation must be max, mean, or sum.")
         if self.cnfi_features is not None and self.cnfi_features != n_features:
@@ -287,7 +296,10 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         graph = nx.DiGraph()
         graph.add_nodes_from(names)
         empty = pd.DataFrame(
-            columns=[*METRIC_ORDER, "lambda", "weight", "source", "target"]
+            columns=[
+                *METRIC_ORDER, "lambda", "weight", "source", "target",
+                "antecedent_item", "consequent_item",
+            ]
         )
         if frequent.empty or not (frequent["itemsets"].map(len) >= 2).any():
             warnings.warn(
@@ -344,6 +356,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
                     "adaptive": adaptive,
                     "source": source,
                     "target": target,
+                    "antecedent_item": antecedent,
+                    "consequent_item": consequent,
                 }
             )
 
@@ -361,6 +375,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             scaled = (metrics - metrics.min(axis=0)) / (
                 metrics.max(axis=0) - metrics.min(axis=0) + self.epsilon
             )
+            for index, metric in enumerate(METRIC_ORDER):
+                rule_table[f"normalized_{metric}"] = scaled[:, index]
             rule_table["weight"] = np.sum(
                 np.stack(rule_table["adaptive"].to_numpy()) * scaled, axis=1
             )
@@ -401,12 +417,18 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
                 updated /= updated.sum()
             else:
                 updated /= norm
-            if np.linalg.norm(updated - eigenvector) < self.tol:
+            distance = np.linalg.norm(
+                updated - eigenvector,
+                ord=1 if self.graph_mode == "normalized" else 2,
+            )
+            if distance < self.tol:
                 eigenvector = updated
                 break
             eigenvector = updated
 
-        pagerank_map = nx.pagerank(graph, alpha=0.85, weight=None)
+        pagerank_map = nx.pagerank(
+            graph, alpha=self.rho, weight=None, max_iter=self.max_iter, tol=self.tol
+        )
         pagerank = np.asarray([pagerank_map[name] for name in nodes], dtype=float)
         out_strength = adjacency.sum(axis=1)
         influence = 0.5 * self._minmax(pagerank) + 0.5 * self._minmax(out_strength)
@@ -417,7 +439,7 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         }
 
     def _normalized_operator(self, adjacency: np.ndarray) -> np.ndarray:
-        """Construct the extension's column-stochastic augmented operator."""
+        """Construct Q in Eqs. 12-15, including the dangling-node fallback."""
         n = len(adjacency)
         in_degree = (adjacency > 0).sum(axis=0).astype(float)
         q = (in_degree + self.epsilon) / (in_degree.sum() + n * self.epsilon)

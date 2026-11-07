@@ -1,108 +1,45 @@
 # Method-to-code correspondence
 
-This document maps the accepted manuscript (BDMA-2026-0010) to the reference
-implementation. Equation numbers refer to the manuscript, which is not
-redistributed in this repository.
+The reference is the supplied 20-page BDMA-2026-0010 manuscript, identified by SHA-256 in [the consistency audit](PAPER_CONSISTENCY_AUDIT_zh-CN.md). Equation numbers refer to that PDF. Default `graph_mode="normalized"` implements its method; the explicit historical `benchmark` option does not.
 
-## Stage 1 - Complex Network Feature Interaction
+## Stage 1: CNFI (Eqs. 1-22; pp. 4-7)
 
-Continuous features are equal-frequency discretized into five bins for
-FP-Growth. Pairwise rules must satisfy `min_support = 0.01` and
-`min_confidence = 0.1` by default. Every rule is evaluated using Confidence,
-Lift, Support, Conviction, and Leverage (Eqs. 1-5).
+Only training features enter FP-Growth; the target is excluded. Numeric columns with more than five distinct values are equal-frequency binned with `pandas.qcut`, with duplicate boundaries dropped. Smaller numeric alphabets are retained as categories. Declare integer-coded categories as string/category dtype so their codes are not binned. Missing feature values form an explicit category; the benchmark tables report no missing values, so this is an implementation convention for other inputs.
 
-The modulation signal uses the manuscript's base-2 PMI proxy:
+Transactions contain feature-qualified value items. FP-Growth uses `max_len=2`, consistent with the scope stated in Section 5.2 (p. 17). Default support/confidence filters are .01/.1. Each qualifying single-item to single-item rule between distinct features has the metrics in Eqs. 1-5, ordered as `[Confidence, Lift, Support, Conviction, Leverage]`.
 
-$$
-\lambda(R_{ij}) = \frac{1}{1 + e^{-\kappa(\log_2 \mathrm{Lift}(R_{ij})-\theta)}}.
-$$
+Conviction is `(1-P(consequent))/(1-confidence+epsilon)`, including when confidence is below 1, with `epsilon=1e-9`. Min-max scale each metric across all qualifying rules (Eq. 7), using the same additive epsilon. A constant metric contributes zero. The rule-specific modulation uses **raw** Lift (Eqs. 6, 9):
 
-The manuscript calls this validated mechanism **dynamic thresholding**. It
-introduces no additional variable: $\theta$ is the logistic transition center,
-$\kappa$ controls its steepness, and the rule-specific $\lambda(R_{ij})$
-changes smoothly with Lift. The FP-Growth support and confidence thresholds
-remain fixed filters. The ablation label “Dynamic thres.” refers to this
-mechanism.
+$$\lambda(R)=\frac{1}{1+\exp[-\kappa(\log_2\mathrm{Lift}(R)-\theta)]}.$$
 
-With metric order `[Confidence, Lift, Support, Conviction, Leverage]`, the
-repository defaults exactly match Table 1:
+The priors match Table 1 (p. 11): `kappa=1`, `theta=0`, `strong_prior=[.40,.20,.10,.20,.10]`, `weak_prior=[.10,.20,.40,.10,.20]`. Eq. 10 interpolates these priors; Eq. 8 sums normalized metrics with the resulting weights. "Dynamic thresholding" names this logistic transition; it does not change the support/confidence filters.
 
-| Parameter | Value |
-|---|---|
-| $\kappa$ | 1.0 |
-| $\theta$ | 0.0 |
-| $w_{strong}$ | `[0.40, 0.20, 0.10, 0.20, 0.10]` |
-| $w_{weak}$ | `[0.10, 0.20, 0.40, 0.10, 0.20]` |
+Every input feature is a graph node, including isolated features. Multiple value-level rules for a directed feature pair contribute their **maximum** weight. Zero-weight edges are omitted (p. 6). For adjacency `A[i,j]` from i to j:
 
-The per-rule metric weight is
-$\omega=\lambda w_{strong}+(1-\lambda)w_{weak}$, and the edge weight is
-$W(R_{ij})=\sum_m \omega_mV_m$ (Eqs. 7-9). The feature graph includes every
-input feature, including isolated nodes, as required by $V=F$.
+- Eqs. 12-13: `q=(in_degree+epsilon)/(sum(in_degree)+d*epsilon)`.
+- Eq. 14: each source column of T is its normalized outgoing weights; a dangling source uses q.
+- Eq. 15: `Q=[[rho*T,q],[(1-rho)*ones(1,d),0]]`, with `rho=.85`.
+- Eq. 16: PageRank uses the **unweighted** directed graph, the same rho, uniform teleportation, and uniform dangling-mass redistribution.
+- Eqs. 17-19: influence is the equal mixture of min-max normalized PageRank and weighted out-strength, with additive epsilon.
+- Eqs. 20-21: initialize uniformly, apply `(I+Q)/2`, normalize by L1, and stop at L1 iterate difference below `1e-6`, or 1000 updates.
+- Eq. 22: `SER[i]=L[i]+influence[i]*L[d]`. An empty positive-edge graph assigns zero to every raw CNFI score (p. 6).
 
-Eigen-Rank is calculated from the extended matrix in Eq. 13. PageRank uses the
-unweighted transition in Eq. 14, out-strength uses Eq. 15, both are min-max
-normalized with $\epsilon_0=10^{-9}$, and the final score follows Eq. 20.
+Audit outputs are `rules_` (value-item identities, raw/normalized metrics, lambda and weights), `graph_`, and `cnfi_values_` (raw SER). `cnfi_scores_` contains normalized **rank** scores, not raw SER.
 
-## Stage 2 - Normalized Mutual Information
+## Stage 2: NMI (Eqs. 23-28; pp. 7-8)
 
-NMI is computed on the original, non-binned feature column, as specified in the
-experimental protocol. Values are treated as empirical discrete outcomes. The
-implementation uses geometric normalization, as specified in the revised manuscript:
+All original, non-binned feature columns are evaluated independently of CNFI. Observed continuous values are empirical discrete categories. NMI uses geometric normalization:
 
-$$
-\mathrm{NMI}(X;Y)=\frac{I(X;Y)}{\sqrt{H(X)H(Y)}}.
-$$
+$$\mathrm{NMI}(X;Y)=\frac{I(X;Y)}{\sqrt{H(X)H(Y)}}.$$
 
-A constant feature or constant target receives 0 because the mathematical
-expression has a zero denominator and carries no usable ranking information.
-Empirical NMI can be inflated for high-cardinality features.
+A constant feature or target receives zero. Empirical NMI can be inflated for high-cardinality features; the implementation follows the paper definition rather than substituting a continuous MI estimator. Inspect `nmi_values_`.
 
-## Stage 3 - Rank fusion
+## Stage 3: rank fusion (Eqs. 29-31; pp. 8-9)
 
-Both CNFI and NMI independently rank every input feature. With $d$ input
-features, both list lengths are $N_{cnfi}=N_{nmi}=d$; there is no intermediate
-CNFI truncation or remaining-feature branch. For each full list of size $N$,
-the rank score is:
+Both branches rank **all d inputs**. For each list, `R=(d-rank)/(d-1)` with one-based rank, or zero if d=1. Match by feature identity and compute `S_final=alpha*R_CNFI+(1-alpha)*R_NMI`, default alpha=.5. Ties retain input-column order, a deterministic convention where the paper does not specify tie handling. Only the fused list is truncated by `n_features_to_select`. Its default `None` implements Algorithm 1's omitted optional k_max.
 
-$$
-R(F_i)=\frac{N-\mathrm{rank}(i)}{N-1}\quad (N>1).
-$$
+The compatibility parameter `cnfi_features` accepts only `None` or d; intermediate branch truncation is rejected.
 
-The best feature scores 1 and the last scores 0. For a single feature the score is 0. This rescales both original branch scores equally and preserves the fused ranking.
-For each feature, the final score is
-$S_{final}=\alpha R_{CNFI}+(1-\alpha)R_{NMI}$. Scores are matched
-by feature name before weighting. At $\alpha=1$ the ranking follows CNFI; at
-$\alpha=0$ it follows NMI across all inputs. Ties retain input-column order.
-Only the final fused ranking is truncated by `n_features_to_select` ($k_{max}$).
+## Historical comparison option
 
-The old `cnfi_features` argument is retained for API compatibility but accepts
-only `None` or $d$. It no longer creates an independently truncated branch.
-
-## Explicit implementation convention
-
-FP-Growth produces multiple bin-level rules that may collapse to the same raw
-feature pair. The manuscript defines one adjacency entry $A_{ij}$ per directed feature
-pair by taking the maximum rule weight. This is the implementation default
-(`edge_aggregation="max"`); `mean` and `sum` remain optional alternatives for
-sensitivity analysis.
-
-
-## Evaluated normalized formulation
-
-Set `graph_mode="normalized"` to use the revised manuscript's normalized
-formulation, which has been evaluated as confirmed by the authors. Each of the
-five rule metrics is min-max scaled across qualifying
-training rules (a constant metric contributes zero), while the modulation
-coefficient still uses raw Lift. Rule weights are the adaptive weighted sum
-of scaled metrics, and feature-pair edges use the maximum. Zero-weight edges
-are omitted from the scaled graph. A smoothed in-degree distribution supplies
-dangling transitions and the auxiliary column of a column-stochastic matrix.
-The stationary vector is estimated by lazy power iteration, `(I + Q)/2`;
-`rho` defaults to 0.85 and must lie strictly between 0 and 1. Empty graphs
-produce tied zero scores.
-
-The default `graph_mode="benchmark"` retains raw rule metrics and its augmented
-spectral operator. The default mode does not indicate the evaluation status of
-the normalized formulation. Configure the graph mode explicitly for each
-experiment and record it with the results; see
-[evaluation status and graph modes](REPRODUCIBILITY.md#evaluation-status-and-graph-modes).
+`graph_mode="benchmark"` keeps raw rule metrics and the previous spectral operator, with a warning. It must be requested explicitly. Optional `mean`/`sum` edge aggregation is available only in that historical mode; paper mode requires `max`. Files under `legacy/` are archival code, not an alternative paper implementation. Historical outputs must not be relabelled as normalized-mode outputs.

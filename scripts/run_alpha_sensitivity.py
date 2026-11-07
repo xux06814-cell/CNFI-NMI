@@ -49,7 +49,7 @@ def main():
     cv=StratifiedKFold(n_splits=a.folds,shuffle=True,random_state=a.seed)
     for fold,(tr,te) in enumerate(cv.split(X,y),1):
         train=X.iloc[tr].reset_index(drop=True);test=X.iloc[te].reset_index(drop=True);yt=y.iloc[tr].reset_index(drop=True);yv=y.iloc[te].reset_index(drop=True)
-        selector=CNFINMISelector(n_features_to_select=a.features,alpha=.5).fit(train,yt)
+        selector=CNFINMISelector(n_features_to_select=a.features,alpha=.5,graph_mode="normalized").fit(train,yt)
         names=list(train.columns); d=len(names)
         if fold==a.network_fold:
             # Encode special characters as ASCII CSV aliases for MATLAB R2019a.
@@ -79,5 +79,8 @@ def main():
     stats=pd.DataFrame(records);metrics=['accuracy','precision','recall','f1','specificity','auc']
     group=stats.groupby('alpha')[metrics];means=group.mean();std=group.std(ddof=1).add_suffix('_sd');means.join(std).reset_index().to_csv(a.output/'sensitivity_stats.csv',index=False)
     metadata={'data_sha256':hashlib.sha256(a.csv.read_bytes()).hexdigest(),'rows':len(X),'inputs':d,'target':a.target,'positive_label':a.positive_label,'dropped':a.drop,'categorical':a.categorical,'seed':a.seed,'folds':a.folds,'network_training_fold':a.network_fold,'features':a.features,'model':{'learning_rate':a.learning_rate,'max_depth':a.max_depth,'n_estimators':a.n_estimators,'threshold':.5},'versions':{'python':sys.version,'numpy':np.__version__,'pandas':pd.__version__,'sklearn':sklearn.__version__,'networkx':nx.__version__,'lightgbm':lightgbm.__version__},'warning':'Exploratory test-fold sweep; not paper exact, not an independent test after alpha selection. Directed adjacency additionally exported; adj.csv symmetrizes by maximum solely for MATLAB chord visualization.','records':records}
+    metadata['graph_mode']='normalized'
+    metadata['selector_parameters']=selector.get_params()
+    metadata['split_indices']=[{'fold':i,'train':tr.tolist(),'test':te.tolist()} for i,(tr,te) in enumerate(cv.split(X,y),1)]
     (a.output/'sensitivity.json').write_text(json.dumps(metadata,indent=2),encoding='utf8')
 if __name__=='__main__':main()
