@@ -13,9 +13,9 @@ Lift, Support, Conviction, and Leverage (Eqs. 1-5).
 
 The modulation signal uses the manuscript's base-2 PMI proxy:
 
-$
+$$
 \lambda(R_{ij}) = \frac{1}{1 + e^{-\kappa(\log_2 \mathrm{Lift}(R_{ij})-\theta)}}.
-$
+$$
 
 The manuscript calls this validated mechanism **dynamic thresholding**. It
 introduces no additional variable: $\theta$ is the logistic transition center,
