@@ -39,11 +39,15 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
 
 - CNFI 连续变量采用 5 档等频离散化；NMI 使用未经 CNFI 离散化的原始列。
 - PMI 代理严格使用 `log2(Lift)`，与原文统一以 bit 为单位。
-- NMI 使用几何均值归一化，对应原文式 (26)。
-- 秩得分严格实现 `(N-rank)/N`，最后一名得分为 0。
+- NMI 使用几何均值归一化，采用修订稿的定义。
+- 秩得分严格实现 `(N-rank)/(N-1)`；单特征得分为 0。
 - 默认参数 `min_support=0.01`、`min_confidence=0.1`、`alpha=0.5`、
   `kappa=1.0`、`theta=0.0` 以及两组先验权重均对应原文。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
+
+修订稿还给出了未用于已报告实验的归一化扩展，可通过
+`graph_mode="normalized"` 启用；默认 `graph_mode="benchmark"` 保留
+实验所用的原始指标和谱算子。经验 NMI 对高基数特征可能偏高。
 
 ## 实验运行
 

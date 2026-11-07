@@ -20,7 +20,7 @@ def _sample_data(n=120):
 
 def test_rank_normalization_matches_equations_27_and_28():
     scores = CNFINMISelector._rank_scores(["a", "b", "c"])
-    assert scores == {"a": pytest.approx(2 / 3), "b": pytest.approx(1 / 3), "c": 0.0}
+    assert scores == {"a": 1.0, "b": 0.5, "c": 0.0}
 
 
 def test_fit_transform_exposes_auditable_outputs():
@@ -112,7 +112,7 @@ def test_fusion_matches_features_not_list_positions(monkeypatch):
     )
     selector = CNFINMISelector(n_features_to_select=2, alpha=0.25).fit(X, y)
     assert selector.feature_scores_ == pytest.approx(
-        dict(zip(X.columns, [0.1875, 0.3125, 0.4375, 0.5625]))
+        dict(zip(X.columns, [0.25, 5 / 12, 7 / 12, 0.75]))
     )
     assert selector.selected_features_ == ["noise_b", "noise_a"]
 
@@ -125,3 +125,39 @@ def test_partial_cnfi_list_is_rejected_and_full_size_is_compatible():
     default = CNFINMISelector(n_features_to_select=2).fit(X, y)
     assert full.feature_scores_ == default.feature_scores_
     assert full.selected_features_ == default.selected_features_
+
+
+def test_single_feature_rank_is_zero():
+    assert CNFINMISelector._rank_scores(["only"]) == {"only": 0.0}
+
+
+def test_normalized_extension_weights_and_empty_graph():
+    X, y = _sample_data()
+    selector = CNFINMISelector(n_features_to_select=2, graph_mode="normalized").fit(X, y)
+    assert selector.rules_["weight"].between(0, 1).all()
+    assert np.isfinite(list(selector.feature_scores_.values())).all()
+    import networkx as nx
+    graph = nx.DiGraph()
+    graph.add_nodes_from(["a", "b"])
+    assert selector._eigen_rank(graph) == {"a": 0.0, "b": 0.0}
+
+
+def test_normalized_extension_handles_dangling_node():
+    import networkx as nx
+    graph = nx.DiGraph()
+    graph.add_nodes_from(["a", "b", "c"])
+    graph.add_edge("a", "b", weight=0.5)
+    selector = CNFINMISelector(graph_mode="normalized")
+    scores = selector._eigen_rank(graph)
+    assert all(np.isfinite(list(scores.values())))
+    assert all(v >= 0 for v in scores.values())
+
+
+def test_normalized_operator_is_stochastic_with_dangling_nodes():
+    selector = CNFINMISelector(graph_mode="normalized")
+    adjacency = np.array([[0.0, 0.5, 0.5], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    operator = selector._normalized_operator(adjacency)
+    assert np.all(operator >= 0)
+    np.testing.assert_allclose(operator.sum(axis=0), 1.0)
+    np.testing.assert_allclose(operator[:3, 0], [0, 0.425, 0.425])
+    np.testing.assert_allclose(operator[:3, 1], 0.85 * operator[:3, 3])

@@ -40,7 +40,7 @@ normalized with $\epsilon_0=10^{-9}$, and the final score follows Eq. 20.
 
 NMI is computed on the original, non-binned feature column, as specified in the
 experimental protocol. Values are treated as empirical discrete outcomes. The
-implementation uses geometric normalization, matching Eq. 26:
+implementation uses geometric normalization, as specified in the revised manuscript:
 
 $$
 \mathrm{NMI}(X;Y)=\frac{I(X;Y)}{\sqrt{H(X)H(Y)}}.
@@ -48,6 +48,7 @@ $$
 
 A constant feature or constant target receives 0 because the mathematical
 expression has a zero denominator and carries no usable ranking information.
+Empirical NMI can be inflated for high-cardinality features.
 
 ## Stage 3 - Rank fusion
 
@@ -57,12 +58,12 @@ CNFI truncation or remaining-feature branch. For each full list of size $N$,
 the rank score is:
 
 $$
-R(F_i)=\frac{N-\mathrm{rank}(i)}{N}.
+R(F_i)=\frac{N-\mathrm{rank}(i)}{N-1}\quad (N>1).
 $$
 
-Consequently, the best feature scores $(N-1)/N$ and the last feature scores 0.
+The best feature scores 1 and the last scores 0. For a single feature the score is 0. This rescales both original branch scores equally and preserves the fused ranking.
 For each feature, the final score is
-$S_{final}=\alpha R_{CNFI}+(1-\alpha)R_{NMI}$ (Eq. 29). Scores are matched
+$S_{final}=\alpha R_{CNFI}+(1-\alpha)R_{NMI}$. Scores are matched
 by feature name before weighting. At $\alpha=1$ the ranking follows CNFI; at
 $\alpha=0$ it follows NMI across all inputs. Ties retain input-column order.
 Only the final fused ranking is truncated by `n_features_to_select` ($k_{max}$).
@@ -77,3 +78,19 @@ feature pair. The manuscript defines one adjacency entry $A_{ij}$ per directed f
 pair by taking the maximum rule weight. This is the implementation default
 (`edge_aggregation="max"`); `mean` and `sum` remain optional alternatives for
 sensitivity analysis.
+
+
+## Normalized extension (not part of the reported benchmark)
+
+Set `graph_mode="normalized"` to use the revised manuscript's optional
+extension. Each of the five rule metrics is min-max scaled across qualifying
+training rules (a constant metric contributes zero), while the modulation
+coefficient still uses raw Lift. Rule weights are the adaptive weighted sum
+of scaled metrics, and feature-pair edges use the maximum. Zero-weight edges
+are omitted from the scaled graph. A smoothed in-degree distribution supplies
+dangling transitions and the auxiliary column of a column-stochastic matrix.
+The stationary vector is estimated by lazy power iteration, `(I + Q)/2`;
+`rho` defaults to 0.85 and must lie strictly between 0 and 1. Empty graphs
+produce tied zero scores. This extension has not been evaluated in the
+reported experiments; the default `graph_mode="benchmark"` retains raw rule
+metrics and the augmented spectral operator used for those experiments.

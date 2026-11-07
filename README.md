@@ -27,8 +27,14 @@ CNFI-NMI ranks tabular features by combining two complementary signals:
    their normalized rank scores with alpha = 0.5 by default. Only then are the
    requested top features retained.
 
-The maintained implementation follows Eqs. (1)-(29), exposes intermediate
+The maintained implementation follows the revised method, exposes intermediate
 rules/graphs/scores for audit, and is compatible with scikit-learn pipelines.
+
+Rank scores use `(d - rank) / (d - 1)` for `d > 1` and zero for a single
+feature. The optional `graph_mode="normalized"` implements the revised
+normalized extension; it was not used in the reported benchmark. The default
+`graph_mode="benchmark"` retains the reported raw metrics and spectral operator.
+Empirical NMI can be inflated for high-cardinality features.
 
 ## Installation
 

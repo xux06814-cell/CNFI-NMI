@@ -1,4 +1,4 @@
-"""CNFI-NMI, implemented from Eqs. (1)-(29) of BDMA-2026-0010."""
+"""CNFI-NMI, implemented from the revised manuscript of BDMA-2026-0010."""
 
 from __future__ import annotations
 
@@ -56,6 +56,9 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         Deterministic reduction when several bin-level rules map to the same
         feature pair. ``max`` retains the strongest rule, matching the
         manuscript and the repository default.
+    graph_mode:
+        ``benchmark`` uses the reported raw metrics and spectral operator;
+        ``normalized`` enables the unevaluated normalized extension.
     target_col:
         Optional compatibility convenience. When ``y`` is omitted in ``fit``,
         this column is removed from ``X`` and used as the target.
@@ -87,6 +90,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             0.20,
         ),
         edge_aggregation: Literal["max", "mean", "sum"] = "max",
+        graph_mode: Literal["benchmark", "normalized"] = "benchmark",
+        rho: float = 0.85,
         epsilon: float = 1e-9,
         max_iter: int = 1000,
         tol: float = 1e-6,
@@ -103,6 +108,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         self.strong_prior = strong_prior
         self.weak_prior = weak_prior
         self.edge_aggregation = edge_aggregation
+        self.graph_mode = graph_mode
+        self.rho = rho
         self.epsilon = epsilon
         self.max_iter = max_iter
         self.tol = tol
@@ -209,6 +216,12 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             raise ValueError("kappa and epsilon must be positive.")
         if self.max_iter < 1 or self.tol <= 0.0:
             raise ValueError("max_iter and tol must be positive.")
+        if self.graph_mode not in {"benchmark", "normalized"}:
+            raise ValueError("graph_mode must be benchmark or normalized.")
+        if not 0.0 < self.rho < 1.0:
+            raise ValueError("rho must be strictly between 0 and 1.")
+        if self.graph_mode == "normalized" and self.edge_aggregation != "max":
+            raise ValueError("The normalized extension requires max edge aggregation.")
         if self.edge_aggregation not in {"max", "mean", "sum"}:
             raise ValueError("edge_aggregation must be max, mean, or sum.")
         if self.cnfi_features is not None and self.cnfi_features != n_features:
@@ -323,12 +336,13 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
                     "leverage": leverage,
                     "lambda": modulation,
                     "weight": weight,
+                    "adaptive": adaptive,
                     "source": source,
                     "target": target,
                 }
             )
 
-        rule_table = pd.DataFrame.from_records(records, columns=empty.columns)
+        rule_table = pd.DataFrame.from_records(records, columns=[*empty.columns, "adaptive"])
         if rule_table.empty:
             warnings.warn(
                 "No cross-feature rules survived filtering; CNFI scores are tied at zero.",
@@ -337,10 +351,21 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             )
             return graph, rule_table, {name: 0.0 for name in names}
 
+        if self.graph_mode == "normalized":
+            metrics = rule_table[list(METRIC_ORDER)].to_numpy(dtype=float)
+            scaled = (metrics - metrics.min(axis=0)) / (
+                metrics.max(axis=0) - metrics.min(axis=0) + self.epsilon
+            )
+            rule_table["weight"] = np.sum(
+                np.stack(rule_table["adaptive"].to_numpy()) * scaled, axis=1
+            )
+        rule_table = rule_table.drop(columns="adaptive")
+
         grouped = rule_table.groupby(["source", "target"], sort=False)["weight"]
         edge_weights = getattr(grouped, self.edge_aggregation)()
         for (source, target), weight in edge_weights.items():
-            graph.add_edge(source, target, weight=float(weight))
+            if self.graph_mode == "benchmark" or weight > 0.0:
+                graph.add_edge(source, target, weight=float(weight))
         return graph, rule_table, self._eigen_rank(graph)
 
     def _eigen_rank(self, graph: nx.DiGraph) -> dict[str, float]:
@@ -357,13 +382,20 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         extended[:n, n] = 1.0
         extended[n, :n] = jump
 
+        if self.graph_mode == "normalized":
+            extended = self._normalized_operator(adjacency)
+            extended = (np.eye(n + 1) + extended) / 2.0
+
         eigenvector = np.ones(n + 1, dtype=float) / (n + 1)
         for _ in range(self.max_iter):
             updated = extended @ eigenvector
             norm = np.linalg.norm(updated)
             if norm <= self.epsilon:
                 break
-            updated /= norm
+            if self.graph_mode == "normalized":
+                updated /= updated.sum()
+            else:
+                updated /= norm
             if np.linalg.norm(updated - eigenvector) < self.tol:
                 eigenvector = updated
                 break
@@ -378,6 +410,21 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             name: float(eigenvector[index] + influence[index] * global_influence)
             for index, name in enumerate(nodes)
         }
+
+    def _normalized_operator(self, adjacency: np.ndarray) -> np.ndarray:
+        """Construct the extension's column-stochastic augmented operator."""
+        n = len(adjacency)
+        in_degree = (adjacency > 0).sum(axis=0).astype(float)
+        q = (in_degree + self.epsilon) / (in_degree.sum() + n * self.epsilon)
+        out = adjacency.sum(axis=1)
+        transition = np.empty((n, n), dtype=float)
+        for j in range(n):
+            transition[:, j] = adjacency[j, :] / out[j] if out[j] > 0 else q
+        operator = np.zeros((n + 1, n + 1), dtype=float)
+        operator[:n, :n] = self.rho * transition
+        operator[:n, n] = q
+        operator[n, :n] = 1.0 - self.rho
+        return operator
 
     def _minmax(self, values: np.ndarray) -> np.ndarray:
         return (values - values.min()) / (values.max() - values.min() + self.epsilon)
@@ -407,10 +454,10 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
     def _rank_scores(order: Iterable[str]) -> dict[str, float]:
         ordered = list(order)
         size = len(ordered)
-        if size == 0:
-            return {}
+        if size <= 1:
+            return {name: 0.0 for name in ordered}
         return {
-            name: (size - rank) / size for rank, name in enumerate(ordered, start=1)
+            name: (size - rank) / (size - 1) for rank, name in enumerate(ordered, start=1)
         }
 
     @staticmethod
