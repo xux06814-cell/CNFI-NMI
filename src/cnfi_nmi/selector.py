@@ -51,7 +51,9 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
     n_bins:
         Number of equal-frequency bins used only by CNFI.
     kappa, theta:
-        Logistic modulation parameters from Eq. (8).
+        Parameters of the validated dynamic-threshold mechanism. theta is the
+        logistic transition center and kappa controls its steepness; the
+        rule-specific lambda changes without another threshold variable.
     edge_aggregation:
         Deterministic reduction when several bin-level rules map to the same
         feature pair. ``max`` retains the strongest rule, matching the
@@ -318,6 +320,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
                 1.0 - confidence + self.epsilon
             )
             log_lift = math.log2(max(lift, self.epsilon))
+            # Validated dynamic threshold: theta is the existing transition
+            # center, while the rule-specific lambda varies smoothly with Lift.
             z = np.clip(self.kappa * (log_lift - self.theta), -709.0, 709.0)
             modulation = float(1.0 / (1.0 + math.exp(-z)))
             adaptive = modulation * np.asarray(self.strong_prior, dtype=float) + (

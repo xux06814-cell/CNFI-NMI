@@ -16,9 +16,9 @@
 
 CNFI-NMI 将两类互补信息融合为统一的特征排序：
 
-1. **CNFI 阶段**：通过 FP-Growth 挖掘两两关联规则，动态融合置信度、
-   提升度、支持度、确信度和杠杆率，构建加权有向特征网络，再使用
-   Eigen-Rank 计算交互重要性。
+1. **CNFI 阶段**：通过 FP-Growth 挖掘两两关联规则，使用已验证的动态阈值
+   Logistic 机制融合置信度、提升度、支持度、确信度和杠杆率，构建加权
+   有向特征网络，再使用 Eigen-Rank 计算交互重要性。
 2. **NMI 阶段**：独立地对全部输入特征计算其与目标变量的归一化
    互信息，衡量非线性相关性。
 3. **秩融合阶段**：CNFI 和 NMI 都给出全部输入特征的排序；先将两份
@@ -43,6 +43,10 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
 - 秩得分严格实现 `(N-rank)/(N-1)`；单特征得分为 0。
 - 默认参数 `min_support=0.01`、`min_confidence=0.1`、`alpha=0.5`、
   `kappa=1.0`、`theta=0.0` 以及两组先验权重均对应原文。
+- “动态阈值”指现有 Logistic 过渡机制：`theta` 是过渡中心，`kappa`
+  控制陡峭度，逐规则的 `lambda` 随 Lift 平滑变化，不引入新的阈值变量；
+  FP-Growth 的支持度和置信度筛选阈值保持固定。消融项 “Dynamic thres.”
+  即指该机制。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
 修订稿还给出了未用于已报告实验的归一化扩展，可通过
