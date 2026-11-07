@@ -59,9 +59,7 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         feature pair. ``max`` retains the strongest rule, matching the
         manuscript and the repository default.
     graph_mode:
-        ``normalized`` (default) implements Eqs. 7-22 of the manuscript.
-        ``benchmark`` retains the historical raw-metric spectral variant for
-        comparison only; it is not the algorithm specified by this manuscript.
+        ``normalized`` implements Eqs. 7-22 of the manuscript.
     target_col:
         Optional compatibility convenience. When ``y`` is omitted in ``fit``,
         this column is removed from ``X`` and used as the target.
@@ -92,8 +90,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             0.10,
             0.20,
         ),
-        edge_aggregation: Literal["max", "mean", "sum"] = "max",
-        graph_mode: Literal["benchmark", "normalized"] = "normalized",
+        edge_aggregation: Literal["max"] = "max",
+        graph_mode: Literal["normalized"] = "normalized",
         rho: float = 0.85,
         epsilon: float = 1e-9,
         max_iter: int = 1000,
@@ -125,14 +123,6 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
         self.n_features_in_ = len(self.feature_names_in_)
 
         self._validate_parameters(self.n_features_in_)
-        if self.graph_mode == "benchmark":
-            warnings.warn(
-                "graph_mode='benchmark' uses historical raw metrics and a "
-                "spectral operator that do not implement the supplied manuscript. "
-                "Use graph_mode='normalized' for paper-aligned results.",
-                UserWarning,
-                stacklevel=2,
-            )
         discretized = self._equal_frequency_binning(X_features)
         self.graph_, self.rules_, raw_cnfi = self._fit_cnfi(discretized)
         self.cnfi_values_ = raw_cnfi
@@ -228,14 +218,12 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             raise ValueError("kappa and epsilon must be positive.")
         if self.max_iter < 1 or self.tol <= 0.0:
             raise ValueError("max_iter and tol must be positive.")
-        if self.graph_mode not in {"benchmark", "normalized"}:
-            raise ValueError("graph_mode must be benchmark or normalized.")
+        if self.graph_mode != "normalized":
+            raise ValueError("graph_mode must be normalized.")
         if not 0.0 < self.rho < 1.0:
             raise ValueError("rho must be strictly between 0 and 1.")
-        if self.graph_mode == "normalized" and self.edge_aggregation != "max":
+        if self.edge_aggregation != "max":
             raise ValueError("The manuscript's normalized mode requires max edge aggregation.")
-        if self.edge_aggregation not in {"max", "mean", "sum"}:
-            raise ValueError("edge_aggregation must be max, mean, or sum.")
         if self.cnfi_features is not None and self.cnfi_features != n_features:
             raise ValueError(
                 "cnfi_features must be None or the total number of input features; "
@@ -370,22 +358,21 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             )
             return graph, rule_table, {name: 0.0 for name in names}
 
-        if self.graph_mode == "normalized":
-            metrics = rule_table[list(METRIC_ORDER)].to_numpy(dtype=float)
-            scaled = (metrics - metrics.min(axis=0)) / (
-                metrics.max(axis=0) - metrics.min(axis=0) + self.epsilon
-            )
-            for index, metric in enumerate(METRIC_ORDER):
-                rule_table[f"normalized_{metric}"] = scaled[:, index]
-            rule_table["weight"] = np.sum(
-                np.stack(rule_table["adaptive"].to_numpy()) * scaled, axis=1
-            )
+        metrics = rule_table[list(METRIC_ORDER)].to_numpy(dtype=float)
+        scaled = (metrics - metrics.min(axis=0)) / (
+            metrics.max(axis=0) - metrics.min(axis=0) + self.epsilon
+        )
+        for index, metric in enumerate(METRIC_ORDER):
+            rule_table[f"normalized_{metric}"] = scaled[:, index]
+        rule_table["weight"] = np.sum(
+            np.stack(rule_table["adaptive"].to_numpy()) * scaled, axis=1
+        )
         rule_table = rule_table.drop(columns="adaptive")
 
         grouped = rule_table.groupby(["source", "target"], sort=False)["weight"]
         edge_weights = getattr(grouped, self.edge_aggregation)()
         for (source, target), weight in edge_weights.items():
-            if self.graph_mode == "benchmark" or weight > 0.0:
+            if weight > 0.0:
                 graph.add_edge(source, target, weight=float(weight))
         return graph, rule_table, self._eigen_rank(graph)
 
@@ -395,17 +382,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             return {name: 0.0 for name in nodes}
 
         adjacency = nx.to_numpy_array(graph, nodelist=nodes, weight="weight")
-        in_degree = (adjacency > 0.0).sum(axis=0).astype(float)
-        jump = in_degree / (in_degree.sum() + self.epsilon)
         n = len(nodes)
-        extended = np.zeros((n + 1, n + 1), dtype=float)
-        extended[:n, :n] = adjacency
-        extended[:n, n] = 1.0
-        extended[n, :n] = jump
-
-        if self.graph_mode == "normalized":
-            extended = self._normalized_operator(adjacency)
-            extended = (np.eye(n + 1) + extended) / 2.0
+        extended = (np.eye(n + 1) + self._normalized_operator(adjacency)) / 2.0
 
         eigenvector = np.ones(n + 1, dtype=float) / (n + 1)
         for _ in range(self.max_iter):
@@ -413,14 +391,8 @@ class CNFINMISelector(TransformerMixin, BaseEstimator):
             norm = np.linalg.norm(updated)
             if norm <= self.epsilon:
                 break
-            if self.graph_mode == "normalized":
-                updated /= updated.sum()
-            else:
-                updated /= norm
-            distance = np.linalg.norm(
-                updated - eigenvector,
-                ord=1 if self.graph_mode == "normalized" else 2,
-            )
+            updated /= updated.sum()
+            distance = np.linalg.norm(updated - eigenvector, ord=1)
             if distance < self.tol:
                 eigenvector = updated
                 break

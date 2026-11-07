@@ -50,7 +50,7 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
 默认 `graph_mode="normalized"` 对应论文的指标归一化、列随机增广算子和惰性幂迭代。
-历史 `benchmark` 模式需显式指定，不对应本版论文方法。详见[方法映射](docs/METHODOLOGY.md)和[逐项核查](docs/PAPER_CONSISTENCY_AUDIT_zh-CN.md)。
+详见[方法映射](docs/METHODOLOGY.md)。
 经验 NMI 对高基数特征可能偏高。
 
 ## 实验运行
@@ -72,7 +72,6 @@ examples/           读取使用者 CSV 的运行示例
 docs/               方法映射与严格复现规范
 paper/              论文来源与获取说明
 data/               数据来源与校验要求（不直接分发原始数据）
-legacy/             原仓库代码快照，仅供审计追溯
 ```
 
 ## 许可说明

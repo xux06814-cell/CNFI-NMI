@@ -116,9 +116,9 @@ def test_original_continuous_values_use_geometric_nmi():
     assert selector._geometric_nmi(X.continuous, pd.Series([1] * 6)) == 0
 
 
-def test_historical_mode_is_explicitly_identified():
+def test_historical_mode_is_rejected():
     X = pd.DataFrame({"a": [0, 0, 1, 1], "b": [0, 1, 0, 1]})
-    with pytest.warns(UserWarning, match="do not implement the supplied manuscript"):
+    with pytest.raises(ValueError, match="graph_mode must be normalized"):
         CNFINMISelector(graph_mode="benchmark").fit(X, X.a)
 
 

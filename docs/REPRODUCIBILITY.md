@@ -30,7 +30,7 @@ Exclude identifiers and target-source columns. Missing targets are rejected. The
 
 The runner performs five stratified outer folds. Within each outer training fold, the selector sees original observations and category identities. CNFI alone discretizes continuous values; NMI uses original values. After selection, training-derived median filling and categorical encoding prepare selected columns for LightGBM; unknown test categories receive -1. An all-missing numeric training column receives a classifier-side fill of 0.
 
-Preprocessing and feature selection precede three-fold inner LightGBM search. This follows the disclosed ordering on p. 10: **inner tuning is not fully nested**, while each outer test fold remains held out. The code does not claim fully nested validation.
+Preprocessing and feature selection precede three-fold inner LightGBM search; each outer test fold remains held out. Inner tuning is therefore not fully nested.
 
 | Setting | Value | Status |
 |---|---|---|
@@ -48,14 +48,10 @@ Preprocessing and feature selection precede three-fold inner LightGBM search. Th
 
 Output JSON records graph mode, selector parameters, input SHA-256, positive label, schema declarations, software versions, positional train/test indices, per-fold feature selections, classifier parameters, metrics, means and sample SD (`ddof=1`). Save the code commit and exact command alongside it.
 
-## Evaluation status and graph modes
+## Scope of reproduction
 
-`normalized` implements the supplied paper and is the default. The explicit historical `benchmark` mode uses raw metrics and another spectral operator; it is retained for comparison and emits a warning. Both experiment scripts and quickstart explicitly use `normalized`.
-
-Formula tests and small CLI fixtures establish implementation consistency. They do **not** independently verify reported dataset scores. No processed benchmark inputs, original fold assignments, complete original grid or per-fold result archives are bundled. Previously stated author confirmations are not independent reproduction evidence.
+Formula tests and small CLI fixtures check the implementation. Processed benchmark inputs, original fold assignments, the complete original grid and per-fold result archives are not bundled, so the reported scores have not been independently reproduced.
 
 The main runner evaluates CNFI-NMI. It does not recreate PGI-SDMI, SDMI, MFS, PSO or Table 5 component ablations. Alpha=0/1 in the sweep covers pure NMI/CNFI endpoints, but not those other methods. Their full specifications and measured outputs are required before claiming table/figure reproduction.
 
-The paper says LightGBM is unified for tests while also describing literature comparators named for other learners. The repository does not resolve that ambiguity by inventing comparator implementations or settings.
-
-See [dataset provenance](../data/README.md), [figure/sweep instructions](FIGURES_AND_SENSITIVITY.md), and [the consistency audit](PAPER_CONSISTENCY_AUDIT_zh-CN.md).
+See [dataset provenance](../data/README.md) and [figure/sweep instructions](FIGURES_AND_SENSITIVITY.md).

@@ -1,6 +1,6 @@
 # Method-to-code correspondence
 
-The reference is the supplied 20-page BDMA-2026-0010 manuscript, identified by SHA-256 in [the consistency audit](PAPER_CONSISTENCY_AUDIT_zh-CN.md). Equation numbers refer to that PDF. Default `graph_mode="normalized"` implements its method; the explicit historical `benchmark` option does not.
+Equation numbers refer to the 20-page BDMA-2026-0010 accepted manuscript. The selector uses `graph_mode="normalized"`.
 
 ## Stage 1: CNFI (Eqs. 1-22; pp. 4-7)
 
@@ -40,6 +40,3 @@ Both branches rank **all d inputs**. For each list, `R=(d-rank)/(d-1)` with one-
 
 The compatibility parameter `cnfi_features` accepts only `None` or d; intermediate branch truncation is rejected.
 
-## Historical comparison option
-
-`graph_mode="benchmark"` keeps raw rule metrics and the previous spectral operator, with a warning. It must be requested explicitly. Optional `mean`/`sum` edge aggregation is available only in that historical mode; paper mode requires `max`. Files under `legacy/` are archival code, not an alternative paper implementation. Historical outputs must not be relabelled as normalized-mode outputs.

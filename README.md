@@ -28,19 +28,14 @@ CNFI-NMI ranks tabular features by combining two complementary signals:
    their normalized rank scores with alpha = 0.5 by default. Only then are the
    requested top features retained.
 
-The maintained implementation follows the revised method, exposes intermediate
-rules/graphs/scores for audit, and is compatible with scikit-learn pipelines.
-“Dynamic thresholding” denotes the existing logistic transition: theta is its
-center, kappa its steepness, and the rule-specific lambda changes with Lift. It
-does not introduce another threshold variable or change the fixed FP-Growth
-support and confidence filters.
+The implementation exposes intermediate rules, graphs, and scores and is
+compatible with scikit-learn pipelines. Dynamic thresholding uses a logistic
+transition centered at theta with steepness kappa.
 
 Rank scores use `(d - rank) / (d - 1)` for `d > 1` and zero for a single
 feature. The default `graph_mode="normalized"` implements the manuscript's
-min-max-scaled rule metrics and column-stochastic Eigen-Rank operator. The
-historical `benchmark` mode must be requested explicitly and does not
-implement the supplied manuscript. See [method mapping](docs/METHODOLOGY.md)
-and [consistency audit](docs/PAPER_CONSISTENCY_AUDIT_zh-CN.md).
+min-max-scaled rule metrics and column-stochastic Eigen-Rank operator. See
+[method mapping](docs/METHODOLOGY.md) for the equations and implementation.
 
 Empirical NMI can be inflated for high-cardinality features.
 
@@ -116,7 +111,6 @@ examples/           quick start with a user-supplied CSV
 docs/               method mapping and reproducibility protocol
 paper/              manuscript provenance and availability notice
 data/               provenance requirements; raw data are not redistributed
-legacy/             original two-file snapshot for auditability
 ```
 
 ## Citation
