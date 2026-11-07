@@ -19,8 +19,9 @@ Accepted manuscript · *Big Data Mining and Analytics* · BDMA-2026-0010
 CNFI-NMI ranks tabular features by combining two complementary signals:
 
 1. **CNFI** mines pairwise association rules, fuses Confidence, Lift, Support,
-   Conviction, and Leverage with adaptive weights, builds a weighted directed
-   feature network, and applies Eigen-Rank.
+   Conviction, and Leverage through the validated dynamic-threshold logistic
+   weighting mechanism, builds a weighted directed feature network, and applies
+   Eigen-Rank.
 2. **NMI** measures scale-normalized feature-target relevance for every input
    feature, independently of the CNFI ranking.
 3. **Rank fusion** matches both full rankings by feature identity and combines
@@ -29,6 +30,10 @@ CNFI-NMI ranks tabular features by combining two complementary signals:
 
 The maintained implementation follows the revised method, exposes intermediate
 rules/graphs/scores for audit, and is compatible with scikit-learn pipelines.
+“Dynamic thresholding” denotes the existing logistic transition: theta is its
+center, kappa its steepness, and the rule-specific lambda changes with Lift. It
+does not introduce another threshold variable or change the fixed FP-Growth
+support and confidence filters.
 
 Rank scores use `(d - rank) / (d - 1)` for `d > 1` and zero for a single
 feature. The optional `graph_mode="normalized"` implements the revised
