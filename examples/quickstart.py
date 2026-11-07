@@ -25,7 +25,9 @@ def main():
         raise ValueError(f"Exclude target source columns with --drop: {sorted(sources)}")
     for name in args.categorical:
         X[name] = X[name].astype("string")
-    selector = CNFINMISelector(n_features_to_select=args.features).fit(X, y)
+    selector = CNFINMISelector(
+        n_features_to_select=args.features, graph_mode="normalized"
+    ).fit(X, y)
     print("Selected features:", selector.selected_features_)
     print("Fused scores:", selector.feature_scores_)
     print("Transformed shape:", selector.transform(X).shape)

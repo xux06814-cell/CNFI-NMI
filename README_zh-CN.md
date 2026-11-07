@@ -49,15 +49,13 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
   即指该机制。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
-修订稿中的归一化方案已经完成评估，可通过 `graph_mode="normalized"` 启用。
-该模式对五项规则指标进行 min-max 归一化，并使用列随机增广算子及惰性幂迭代。
-默认 `graph_mode="benchmark"` 保留原始指标的谱计算实现；配置实验时应明确选择
-所需模式，详见[评估状态与图模式](docs/REPRODUCIBILITY.md#evaluation-status-and-graph-modes)。
+默认 `graph_mode="normalized"` 对应论文的指标归一化、列随机增广算子和惰性幂迭代。
+历史 `benchmark` 模式需显式指定，不对应本版论文方法。详见[方法映射](docs/METHODOLOGY.md)和[逐项核查](docs/PAPER_CONSISTENCY_AUDIT_zh-CN.md)。
 经验 NMI 对高基数特征可能偏高。
 
 ## 实验运行
 
-仓库提供特征选择器、五折 LightGBM 实验和 α 敏感性扫描。使用者传入自己的处理后数据，并保存本次运行生成的结果文件。输入定义见[数据说明](data/README.md)，验证流程和参数见[实验设置](docs/REPRODUCIBILITY.md)。
+仓库提供特征选择器、五折 LightGBM 实验和 α 敏感性扫描。使用者传入处理后数据，并显式指定 `--positive-label`，保存本次运行的结果文件。输入定义见[数据说明](data/README.md)，验证流程和参数见[实验设置](docs/REPRODUCIBILITY.md)。
 
 ## 参数敏感性与 MATLAB 绘图
 
