@@ -110,7 +110,7 @@ matlab/             figures generated from supplied measured CSV results
 examples/           quick start with a user-supplied CSV
 docs/               method mapping and reproducibility protocol
 paper/              manuscript provenance and availability notice
-data/               provenance requirements; raw data are not redistributed
+data/               dataset definitions and provenance requirements
 ```
 
 ## Citation

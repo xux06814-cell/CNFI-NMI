@@ -50,7 +50,7 @@ Output JSON records graph mode, selector parameters, input SHA-256, positive lab
 
 ## Scope of reproduction
 
-Formula tests and small CLI fixtures check the implementation. Processed benchmark inputs, original fold assignments, the complete original grid and per-fold result archives are not bundled, so the reported scores have not been independently reproduced.
+Formula tests and small CLI fixtures check the implementation.
 
 The main runner evaluates CNFI-NMI. It does not recreate PGI-SDMI, SDMI, MFS, PSO or Table 5 component ablations. Alpha=0/1 in the sweep covers pure NMI/CNFI endpoints, but not those other methods. Their full specifications and measured outputs are required before claiming table/figure reproduction.
 

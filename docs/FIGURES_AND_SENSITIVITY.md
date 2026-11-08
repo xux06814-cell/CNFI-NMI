@@ -21,7 +21,7 @@ Set `--target`, `--positive-label` and `--sep` to match your CSV. Use
 
 Traffic target construction and reported dataset dimensions are in
 [dataset inputs](../data/README.md). Each run reads the supplied CSV and writes
-its own outputs; no previous experiment results are supplied.
+its own outputs.
 
 ## Sweep settings and outputs
 

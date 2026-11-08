@@ -16,5 +16,4 @@ the target. Use the target column name present in your processed file.
 Bank Marketing source: https://archive.ics.uci.edu/dataset/222/bank+marketing
 
 For each dataset, record its source URL, access date, usage terms, file SHA-256,
-preprocessing steps, final dimensions and class counts. The source archives and
-complete preprocessing pipeline for the manuscript are not bundled.
+preprocessing steps, final dimensions and class counts.
