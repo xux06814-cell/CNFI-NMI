@@ -1,0 +1,17 @@
+Feature,Score
+age,0.375
+job,0.46875
+marital,0.0625
+education,0.25
+default,0.0625
+balance,0.6875
+housing,0.625
+loan,0.46875
+contact,0.71875
+day,0.53125
+month,0.8125
+duration,0.4375
+campaign,0.375
+pdays,0.5
+previous,0.375
+poutcome,0.75

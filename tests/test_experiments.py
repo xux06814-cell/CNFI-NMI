@@ -14,12 +14,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture
 def csv_path(tmp_path):
-    rows = np.arange(60)
+    rows = np.indices((8, 8, 2, 2)).reshape(4, -1).T
     frame = pd.DataFrame({
-        "continuous": rows / 10,
-        "category_code": rows % 8,
-        "partner": (rows // 2) % 2,
-        "target": np.where(rows % 2, "disease", "healthy"),
+        "continuous": rows[:, 0] / 10,
+        "category_code": rows[:, 1],
+        "partner": rows[:, 2],
+        "target": np.where(rows[:, 3], "disease", "healthy"),
     })
     path = tmp_path / "fixture.csv"
     frame.to_csv(path, index=False)
@@ -39,8 +39,8 @@ def test_five_fold_cli_records_paper_mode_and_disjoint_splits(csv_path, tmp_path
             "--target", "target", "--positive-label", "disease", "--features", 2,
             "--categorical", "category_code", "--threads", 1, "--output", output)
     result = json.loads(output.read_text(encoding="utf-8"))
-    assert result["graph_mode"] == "normalized"
-    assert result["selector_parameters"]["graph_mode"] == "normalized"
+    assert result["graph_mode"] == "paper"
+    assert result["selector_parameters"]["graph_mode"] == "paper"
     assert result["positive_label"] == "disease"
     held_out = []
     for fold in result["folds"]:
@@ -48,7 +48,7 @@ def test_five_fold_cli_records_paper_mode_and_disjoint_splits(csv_path, tmp_path
         held_out.extend(fold["test_indices"])
         assert len(fold["selected_features"]) == 2
         assert 0 <= fold["auc"] <= 1
-    assert sorted(held_out) == list(range(60))
+    assert sorted(held_out) == list(range(256))
 
 
 def test_sweep_exports_directed_graph_and_paper_metadata(csv_path, tmp_path):
@@ -58,7 +58,7 @@ def test_sweep_exports_directed_graph_and_paper_metadata(csv_path, tmp_path):
             "--categorical", "category_code", "--n-estimators", 2,
             "--threads", 1, "--output", output)
     result = json.loads((output / "sensitivity.json").read_text(encoding="utf-8"))
-    assert result["graph_mode"] == "normalized"
+    assert result["graph_mode"] == "paper"
     assert len(result["records"]) == 55
     assert len(result["split_indices"]) == 5
     stats = pd.read_csv(output / "sensitivity_stats.csv")
@@ -76,7 +76,7 @@ def test_quickstart_uses_the_paper_defaults(csv_path):
     result = run_cli("examples/quickstart.py", "--csv", csv_path,
                      "--target", "target", "--features", 2,
                      "--categorical", "category_code")
-    assert "Transformed shape: (60, 2)" in result.stdout
+    assert "Transformed shape: (256, 2)" in result.stdout
 
 
 def test_evaluation_rejects_missing_targets(csv_path, tmp_path):

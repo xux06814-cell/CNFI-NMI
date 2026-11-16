@@ -6,21 +6,17 @@ from cnfi_nmi import CNFINMISelector
 
 
 def _sample_data(n=120):
-    # Fixed API fixture; not an experimental dataset.
-    rows = np.array([
-        [0, 0, 0.1, 0], [0, 0, 0.5, 1], [0, 0, 0.9, 2],
-        [0, 0, 0.3, 3], [0, 1, 0.7, 4], [0, 0, 0.2, 0],
-        [1, 1, 0.4, 1], [1, 1, 0.8, 2], [1, 1, 0.6, 3],
-        [1, 0, 1.0, 4], [1, 1, 0.0, 0], [1, 1, 1.1, 1],
-    ])
+    # Fixed full-factorial API fixture, not benchmark observations.
+    # Every feature pair has all binary states; the raw-Q fit is aperiodic.
+    rows = np.indices((2, 2, 2, 2)).reshape(4, -1).T
     data = np.tile(rows, (int(np.ceil(n / len(rows))), 1))[:n]
     X = pd.DataFrame(data, columns=["signal", "partner", "noise_a", "noise_b"])
     return X, pd.Series(data[:, 0].astype(int), name="target")
 
 
-def test_rank_normalization_matches_equations_29_and_30():
-    scores = CNFINMISelector._rank_scores(["a", "b", "c"])
-    assert scores == {"a": 1.0, "b": 0.5, "c": 0.0}
+def test_rank_normalization_matches_equations_27_and_28():
+    scores = CNFINMISelector()._rank_scores(["a", "b", "c"])
+    assert scores == {"a": 2/3, "b": 1/3, "c": 0.0}
 
 
 def test_fit_transform_exposes_auditable_outputs():
@@ -46,9 +42,6 @@ def test_fit_transform_exposes_auditable_outputs():
     weak = np.array([0.10, 0.20, 0.40, 0.10, 0.20])
     columns = ["confidence", "lift", "support", "conviction", "leverage"]
     metrics = selector.rules_[columns].to_numpy(float)
-    metrics = (metrics - metrics.min(axis=0)) / (
-        metrics.max(axis=0) - metrics.min(axis=0) + 1e-9
-    )
     expected_weight = (
         expected_lambda * strong + (1 - expected_lambda) * weak
     ) @ metrics[0]
@@ -114,7 +107,7 @@ def test_fusion_matches_features_not_list_positions(monkeypatch):
     )
     selector = CNFINMISelector(n_features_to_select=2, alpha=0.25).fit(X, y)
     assert selector.feature_scores_ == pytest.approx(
-        dict(zip(X.columns, [0.25, 5 / 12, 7 / 12, 0.75]))
+        dict(zip(X.columns, [3 / 16, 5 / 16, 7 / 16, 9 / 16]))
     )
     assert selector.selected_features_ == ["noise_b", "noise_a"]
 
@@ -130,7 +123,7 @@ def test_partial_cnfi_list_is_rejected_and_full_size_is_compatible():
 
 
 def test_single_feature_rank_is_zero():
-    assert CNFINMISelector._rank_scores(["only"]) == {"only": 0.0}
+    assert CNFINMISelector()._rank_scores(["only"]) == {"only": 0.0}
 
 
 def test_paper_mode_weights_and_empty_graph():

@@ -115,7 +115,7 @@ def main():
             n_bins=5,
             kappa=1.0,
             theta=0.0,
-            graph_mode="normalized",
+            graph_mode="paper",
         )
         X_train_selected = selector.fit_transform(X_train, y_train)
         X_test_selected = selector.transform(X_test)
@@ -167,7 +167,7 @@ def main():
     }
     result = {
         "protocol": "5-fold outer holdout; inner tuning is not fully nested",
-        "graph_mode": "normalized",
+        "graph_mode": "paper",
         "input_sha256": hashlib.sha256(args.csv.read_bytes()).hexdigest(),
         "target": args.target,
         "positive_label": args.positive_label,

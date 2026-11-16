@@ -38,7 +38,7 @@ ds_names = {'Financial Dataset', 'Medical Dateset', 'Traffic Dataset'};
 
 panel_labels_map = containers.Map( ...
     {'Financial Dataset','Traffic Dataset','Medical Dateset'}, ...
-    {'(b)  Financial Dataset','(a)  Traffic Dataset','(c)  Medical Dataset'});
+    {'(b)  Financial dataset','(a)  Traffic dataset','(c)  Medical dataset'});
 
 
 % Symmetric triangular layout with a separate full-width shared legend.
@@ -217,12 +217,16 @@ for ds_idx = 1:3
         lbl = char(features(j));
         label_interpreter='none';
         if strcmp(lbl,'Actual_Number_of_Lanes'),lbl='Actual_No_of_Lanes';end
-        if strcmp(lbl,'38_PD≥4MV')
+        if strcmp(lbl,'38_PD≥4MV') || strcmp(lbl,'38_PD_GE_4MV')
             % Use MATLAB's TeX >= glyph to avoid missing Unicode on R2019a.
             lbl='38\_PD\geq4MV';label_interpreter='tex';
         end
 
-        if nmi_n(j) > 0.75
+        emphasize = nmi_n(j) > 0.75;
+        if strcmp(ds,'Medical Dateset')
+            emphasize = any(strcmp(lbl,{'ap_hi','bp_category','bp_category_encoded','ap_lo'}));
+        end
+        if emphasize
             fw = 'bold';
         else
             fw = 'normal';
@@ -259,7 +263,7 @@ for ds_idx = 1:3
 
     annotation('textbox', [fig_x_ctr - 0.14, fig_y_ttl, 0.28, 0.035], ...
         'String', lbl_str, ...
-        'FontName', FONT, 'FontSize', 11, 'FontWeight', 'bold', ...
+        'FontName', FONT, 'FontSize', 11, 'FontWeight', 'normal', ...
         'Color', [0.10 0.10 0.10], ...
         'HorizontalAlignment', 'center', 'VerticalAlignment', 'middle', ...
         'EdgeColor', 'none', 'BackgroundColor', 'none', 'FitBoxToText', 'off');

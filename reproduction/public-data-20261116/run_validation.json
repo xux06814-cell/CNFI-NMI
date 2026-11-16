@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "datasets": {
+    "traffic": {
+      "rows": 85611,
+      "inputs": 85,
+      "sensitivity_records": 55,
+      "folds": 5,
+      "exact_seed42_splits": true,
+      "all_metric_values_finite_and_bounded": true,
+      "all_raw_Q_iterations_converged": true,
+      "max_relative_eigen_residual": 9.849647525651685e-07
+    },
+    "bank": {
+      "rows": 45211,
+      "inputs": 16,
+      "sensitivity_records": 55,
+      "folds": 5,
+      "exact_seed42_splits": true,
+      "all_metric_values_finite_and_bounded": true,
+      "all_raw_Q_iterations_converged": true,
+      "max_relative_eigen_residual": 9.869977919664362e-07
+    },
+    "cardio": {
+      "rows": 68613,
+      "inputs": 15,
+      "sensitivity_records": 55,
+      "folds": 5,
+      "exact_seed42_splits": true,
+      "all_metric_values_finite_and_bounded": true,
+      "all_raw_Q_iterations_converged": true,
+      "max_relative_eigen_residual": 4.125043148932796e-07
+    }
+  },
+  "ablation_records": 35,
+  "paper_sha256": "8da1c637d9f0dabe0ce0ff561bf74e7eda6f03a024eca3981a62c962b0771191"
+}

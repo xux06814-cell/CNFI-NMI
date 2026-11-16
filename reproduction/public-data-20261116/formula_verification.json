@@ -1,0 +1,22 @@
+{
+  "input": "All 45211 freshly downloaded Bank rows, first 8 real predictors; formula validation only, no performance estimate",
+  "pairs_fpgrowth_equal": true,
+  "itemsets": 367,
+  "max_support_error": 0.0,
+  "raw_weight_error": 0.0,
+  "max_score_difference_from_direct_eigendecomposition": 1.2936819321351933e-07,
+  "rank_denominator": "d, verified top rank 7/8",
+  "power_iteration": {
+    "converged": true,
+    "iterations": 15,
+    "iterate_l2_difference": 6.175396668705985e-07,
+    "vector_l2_norm": 1.0,
+    "eigenvalue": 6.243852153095275,
+    "relative_eigen_residual": 2.7310754995516066e-07,
+    "global_influence": 0.05330159261933457,
+    "max_edge_weight": 4.597447111086236,
+    "q_sum": 0.999999999982143,
+    "operator": "Q=[[A,1],[q.T,0]], direct multiplication, L2 norm, no lazy/stochastic operator"
+  },
+  "passed": true
+}

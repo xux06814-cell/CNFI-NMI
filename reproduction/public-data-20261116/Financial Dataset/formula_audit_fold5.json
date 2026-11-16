@@ -1,0 +1,22 @@
+{
+  "full_cnfi": {
+    "converged": true,
+    "iterations": 827,
+    "iterate_l2_difference": 9.973803937215049e-07,
+    "vector_l2_norm": 1.0,
+    "eigenvalue": 1170.0966514856627,
+    "relative_eigen_residual": 9.864332424350345e-07,
+    "global_influence": 5.384131066567752e-05,
+    "max_edge_weight": 2699065.86287885,
+    "q_sum": 0.9999999999958333,
+    "operator": "Q=[[A,1],[q.T,0]], direct multiplication, L2 norm, no lazy/stochastic operator"
+  },
+  "mining": {
+    "frequent_itemsets": 1451,
+    "rules": 2421,
+    "feature_nodes": 16,
+    "feature_edges": 240,
+    "raw_metric_weighting": true,
+    "same_rule_pool_for_all_ablation_rows": true
+  }
+}

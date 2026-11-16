@@ -1,0 +1,46 @@
+{
+  "full_cnfi": {
+    "converged": true,
+    "iterations": 368,
+    "iterate_l2_difference": 9.975926188933562e-07,
+    "vector_l2_norm": 0.9999999999999999,
+    "eigenvalue": 197869177.65300176,
+    "relative_eigen_residual": 9.849647525651685e-07,
+    "global_influence": 6.985393355085603e-11,
+    "max_edge_weight": 197835849.02142692,
+    "q_sum": 0.9999999999998568,
+    "operator": "Q=[[A,1],[q.T,0]], direct multiplication, L2 norm, no lazy/stochastic operator"
+  },
+  "mining": {
+    "frequent_itemsets": 60062,
+    "rules": 101183,
+    "feature_nodes": 85,
+    "feature_edges": 6988,
+    "raw_metric_weighting": true,
+    "same_rule_pool_for_all_ablation_rows": true
+  },
+  "ablation": {
+    "partial_eigen": {
+      "converged": true,
+      "iterations": 9,
+      "iterate_l2_difference": 9.078063925410295e-07,
+      "vector_l2_norm": 1.0,
+      "eigenvalue": 40.4843103714517,
+      "relative_eigen_residual": 1.9461228962333855e-07,
+      "global_influence": 0.0025271346048009553,
+      "max_edge_weight": 1.0,
+      "q_sum": 0.9999999999998568,
+      "operator": "Q=[[A,1],[q.T,0]], direct multiplication, L2 norm, no lazy/stochastic operator"
+    },
+    "static_weights": [
+      0.25,
+      0.2,
+      0.25,
+      0.15000000000000002,
+      0.15000000000000002
+    ],
+    "dynamic_confidence_coefficient": "0.10+0.30*lambda",
+    "graph_control": "same feature nodes, same support/confidence-qualified rule pool, max rule aggregation; no extra Lift>=1 filter",
+    "PGI_adapter": "3-WLR on feature-level graph, not max-state aggregation"
+  }
+}

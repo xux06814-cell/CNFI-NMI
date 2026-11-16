@@ -1,0 +1,86 @@
+original,alias
+Main_Category,Main_Category
+Longitude,Longitude
+Latitude,Latitude
+Day,Day
+duration,duration
+Primary_Vehicle,Primary_Vehicle
+Secondary_Vehicle,Secondary_Vehicle
+Is_Major_Incident,Is_Major_Incident
+Advice_A,Advice_A
+Advice_B,Advice_B
+Closure_Type,Closure_Type
+Direction,Direction
+Main_Street,Main_Street
+Affected_Lanes,Affected_Lanes
+Actual_Number_of_Lanes,Actual_Number_of_Lanes
+Suburb,Suburb
+Traffic_Volume,Traffic_Volume
+SA2_CODE21,SA2_CODE21
+SA3_CODE21,SA3_CODE21
+SA3_NAME21,SA3_NAME21
+SA4_CODE21,SA4_CODE21
+SA4_NAME21,SA4_NAME21
+AREASQKM21,AREASQKM21
+1_Area,1_Area
+2_ML,2_ML
+3_TRL,3_TRL
+4_PRL,4_PRL
+5_SRL,5_SRL
+6_TrRL,6_TrRL
+7_RRL,7_RRL
+8_LsRL,8_LsRL
+9_URL,9_URL
+10_ToRL,10_ToRL
+11_EoR,11_EoR
+12_NoN,12_NoN
+13_NDEs,13_NDEs
+14_NNC2L,14_NNC2L
+15_NNC3L,15_NNC3L
+16_NNC4L,16_NNC4L
+17_AND,17_AND
+18_NE,18_NE
+19_MCI,19_MCI
+20_CoI,20_CoI
+21 NBS,21 NBS
+22_CA,22_CA
+23_EA,23_EA
+24_HA,24_HA
+25_IA,25_IA
+26_OA,26_OA
+27_PA,27_PA
+28_PrA,28_PrA
+29_RA,29_RA
+30_TA,30_TA
+31_WbA,31_WbA
+32_EoLU,32_EoLU
+33_TP,33_TP
+34_PD0MV,34_PD0MV
+35_PD1MV,35_PD1MV
+36_PD2MV,36_PD2MV
+37_PD3MV,37_PD3MV
+38_PD≥4MV,38_PD_GE_4MV
+39_PUE,39_PUE
+40_AMI,40_AMI
+41_NPTtWbyPT,41_NPTtWbyPT
+42_NPTtWbyTx,42_NPTtWbyTx
+43_NPTtWbyCD,43_NPTtWbyCD
+44_NPTtWbyCP,44_NPTtWbyCP
+45_NPTtWbyO,45_NPTtWbyO
+46_NPWfH,46_NPWfH
+47_PWCJH,47_PWCJH
+48_PBCJH,48_PBCJH
+49_ANP_FH,49_ANP_FH
+Tow Truck,Tow Truck
+Motorway Crew,Motorway Crew
+Mechanic,Mechanic
+Heavy vehicle tow truck,Heavy vehicle tow truck
+Tow truck,Tow truck
+Transport for NSW,Transport for NSW
+Motorway crew,Motorway crew
+RMS,RMS
+Incident_Type,Incident_Type
+Num_Vehicles_Involved,Num_Vehicles_Involved
+Month,Month
+Hour,Hour
+distance_to_CBD,distance_to_CBD

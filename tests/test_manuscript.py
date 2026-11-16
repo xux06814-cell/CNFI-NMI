@@ -1,4 +1,4 @@
-"""Independent small-data checks against the supplied manuscript, Eqs. 1-31.
+"""Independent checks against compiled-manuscript raw Eqs. 1-29.
 
 These fixtures test calculations, not the paper's reported benchmark scores.
 """
@@ -14,7 +14,7 @@ from cnfi_nmi.selector import METRIC_ORDER
 def test_defaults_return_full_paper_ranking():
     X = pd.DataFrame({"a": [0, 0, 1, 1], "b": [0, 1, 0, 1]})
     selector = CNFINMISelector().fit(X, X.a)
-    assert selector.graph_mode == "normalized"
+    assert selector.graph_mode == "paper"
     assert selector.n_features_to_select is None
     assert set(selector.selected_features_) == set(X.columns)
     assert set(selector.cnfi_values_) == set(X.columns)
@@ -41,11 +41,10 @@ def test_rules_against_empirical_probabilities_and_max_aggregation():
         ])
     metrics = np.asarray(expected_metrics)
     np.testing.assert_allclose(selector.rules_[list(METRIC_ORDER)], metrics)
-    scaled = (metrics - metrics.min(0)) / (np.ptp(metrics, axis=0) + 1e-9)
     modulation = 1 / (1 + np.exp(-np.log2(metrics[:, 1])))
     priors = (modulation[:, None] * np.array([.4, .2, .1, .2, .1])
               + (1 - modulation[:, None]) * np.array([.1, .2, .4, .1, .2]))
-    weights = (scaled * priors).sum(1)
+    weights = (metrics * priors).sum(1)
     np.testing.assert_allclose(selector.rules_["lambda"], modulation)
     np.testing.assert_allclose(selector.rules_["weight"], weights)
     grouped = selector.rules_.groupby(["source", "target"])["weight"].max()
@@ -55,11 +54,11 @@ def test_rules_against_empirical_probabilities_and_max_aggregation():
 
 @pytest.mark.parametrize("rho", [.6, .85])
 @pytest.mark.parametrize("tolerance", [1e-3, 1e-6])
-def test_eigen_rank_against_explicit_matrix_and_unweighted_pagerank(rho, tolerance, monkeypatch):
+def test_legacy_eigen_rank_against_stochastic_matrix(rho, tolerance, monkeypatch):
     # Asymmetric, unequal-weight network with a dangling and an isolated node.
     A = np.array([[0, .2, .7, 0], [.5, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]])
     graph = nx.from_numpy_array(A, create_using=nx.DiGraph)
-    selector = CNFINMISelector(rho=rho, tol=tolerance)
+    selector = CNFINMISelector(graph_mode="normalized", rho=rho, tol=tolerance)
     q = (np.array([1., 1., 1., 0.]) + 1e-9) / (3 + 4e-9)
     Q = np.zeros((5, 5))
     Q[:4, 0] = rho * np.array([0, 2/9, 7/9, 0])
@@ -97,9 +96,9 @@ def test_eigen_rank_against_explicit_matrix_and_unweighted_pagerank(rho, toleran
                                rtol=0, atol=1e-14)
 
 
-def test_equal_rule_metrics_drop_all_edges_and_score_zero():
+def test_legacy_equal_rule_metrics_drop_all_edges_and_score_zero():
     X = pd.DataFrame({"a": ["same"] * 10, "b": ["same"] * 10})
-    selector = CNFINMISelector().fit(X, [0, 1] * 5)
+    selector = CNFINMISelector(graph_mode="normalized").fit(X, [0, 1] * 5)
     assert selector.rules_["weight"].eq(0).all()
     assert selector.graph_.number_of_edges() == 0
     assert selector.cnfi_values_ == {"a": 0., "b": 0.}
@@ -118,7 +117,7 @@ def test_original_continuous_values_use_geometric_nmi():
 
 def test_historical_mode_is_rejected():
     X = pd.DataFrame({"a": [0, 0, 1, 1], "b": [0, 1, 0, 1]})
-    with pytest.raises(ValueError, match="graph_mode must be normalized"):
+    with pytest.raises(ValueError, match="graph_mode must be paper or normalized"):
         CNFINMISelector(graph_mode="benchmark").fit(X, X.a)
 
 
@@ -126,3 +125,53 @@ def test_paper_mode_rejects_nonpaper_edge_aggregation():
     X = pd.DataFrame({"a": [0, 1], "b": [1, 0]})
     with pytest.raises(ValueError, match="requires max edge aggregation"):
         CNFINMISelector(edge_aggregation="mean").fit(X, X.a)
+
+
+def test_raw_paper_equal_metrics_are_not_scaled_to_zero():
+    X = pd.DataFrame({'a': ['same'] * 10, 'b': ['same'] * 10})
+    selector = CNFINMISelector().fit(X, [0, 1] * 5)
+    # conf=lift=support=1, conviction=leverage=0; lambda=.5.
+    np.testing.assert_allclose(selector.rules_['weight'], .25 + .20 + .25)
+    assert selector.graph_.number_of_edges() == 2
+
+
+def test_raw_paper_rank_against_direct_eigendecomposition():
+    from cnfi_nmi.selector import paper_eigen_rank
+    A = np.array([[0., .2, .7, 0], [.5, 0, .3, 0], [.1, 0, 0, 0], [0, 0, 0, 0]])
+    graph = nx.from_numpy_array(A, create_using=nx.DiGraph)
+    degree = (A > 0).sum(0)
+    Q = np.zeros((5, 5))
+    Q[:4, :4] = A
+    Q[:4, 4] = 1
+    Q[4, :4] = degree / (degree.sum() + 1e-9)
+    eigenvalues, eigenvectors = np.linalg.eig(Q)
+    v = eigenvectors[:, np.argmax(eigenvalues.real)].real
+    v *= np.sign(v.sum())
+    v /= np.linalg.norm(v, 2)
+    # Independent linear solve for unweighted PageRank, uniform dangling mass.
+    transition = (A > 0).astype(float)
+    for row in range(4):
+        transition[row] = transition[row] / transition[row].sum() if transition[row].sum() else .25
+    pr = np.linalg.solve(np.eye(4) - .85 * transition.T, np.full(4, .15 / 4))
+    def norm(values):
+        return (values - values.min()) / (np.ptp(values) + 1e-9)
+    expected = v[:4] + .5 * (norm(pr) + norm(A.sum(1))) * v[4]
+    observed, audit = paper_eigen_rank(graph, tol=1e-9)
+    np.testing.assert_allclose(list(observed.values()), expected, atol=1e-5, rtol=0)
+    assert audit['converged']
+    assert audit['vector_l2_norm'] == pytest.approx(1.)
+
+
+def test_legacy_mode_retains_previous_rank_denominator():
+    assert CNFINMISelector(graph_mode='normalized')._rank_scores(['a', 'b', 'c']) == {'a': 1., 'b': .5, 'c': 0.}
+
+
+def test_raw_periodic_operator_reports_nonconvergence():
+    from cnfi_nmi.selector import paper_eigen_rank
+    # Unequal two-cycle: direct power iteration oscillates, unlike a lazy
+    # operator. Do not silently change the paper's matrix to make this pass.
+    graph = nx.DiGraph()
+    graph.add_edge('a', 'b', weight=2e8)
+    graph.add_edge('b', 'a', weight=1e8)
+    with pytest.raises(ArithmeticError, match='not converged'):
+        paper_eigen_rank(graph, max_iter=50)
