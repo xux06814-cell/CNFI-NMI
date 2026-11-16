@@ -1,0 +1,7 @@
+{
+  "download_date": "2026-11-15",
+  "cnfi_nmi": {"url": "https://github.com/xux06814-cell/CNFI-NMI", "commit": "3dd0549733f6d2038cd32963c7d7373839b35d54"},
+  "traffic_author": {"url": "https://github.com/Future-Mobility-Lab/SydneyIncidents", "commit": "dac71f40900bdd136e1fb1958b07dd70b4d4b2e3"},
+  "pgi_author": {"url": "https://github.com/FengYinLeo/PGI-SDMI", "commit": "e09a449b8d90b25e9cd19da289dbb8324216c48d"},
+  "data_inputs": "Only the freshly downloaded archives in this directory are read by prepare_data.py. No prior local processed data or measured result is loaded."
+}

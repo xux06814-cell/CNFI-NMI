@@ -26,7 +26,7 @@ def main():
     for name in args.categorical:
         X[name] = X[name].astype("string")
     selector = CNFINMISelector(
-        n_features_to_select=args.features, graph_mode="normalized"
+        n_features_to_select=args.features, graph_mode="paper"
     ).fit(X, y)
     print("Selected features:", selector.selected_features_)
     print("Fused scores:", selector.feature_scores_)

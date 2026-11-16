@@ -1,0 +1,21 @@
+method,fold,auc_delta_vs_PGI,f1_delta_vs_PGI,selected_set_changed
++ Multi weight (paper-prior midpoint),1,0.20479982369999994,0.4515381297,True
++ Multi weight (paper-prior midpoint),2,0.1953627146,0.44365097189999997,True
++ Multi weight (paper-prior midpoint),3,0.20843365440000006,0.45222626610000005,True
++ Multi weight (paper-prior midpoint),4,0.2010810232,0.4488311984,True
++ Multi weight (paper-prior midpoint),5,0.20220335690000002,0.4362362594,True
++ Dynamic thres. (paper confidence coefficient),1,0.006993346099999909,0.008452696799999992,True
++ Dynamic thres. (paper confidence coefficient),2,0.00925649620000002,0.0007716962999999577,True
++ Dynamic thres. (paper confidence coefficient),3,0.00699340160000006,-0.012824668499999997,True
++ Dynamic thres. (paper confidence coefficient),4,0.008218137299999984,0.0040130599000000045,True
++ Dynamic thres. (paper confidence coefficient),5,0.005221523600000055,-0.00018738790000000227,True
++ Eigen-Rank (PDF),1,0.18618165729999991,0.3915240557,True
++ Eigen-Rank (PDF),2,0.18259500289999997,0.3872643878,True
++ Eigen-Rank (PDF),3,0.18871068460000007,0.3909276797,True
++ Eigen-Rank (PDF),4,0.18951106820000008,0.3972435089,True
++ Eigen-Rank (PDF),5,0.19403913630000003,0.38813505540000004,True
+"CNFI (full, PDF)",1,0.1594797161999999,0.3624181129,True
+"CNFI (full, PDF)",2,0.15510399249999995,0.3497084462,True
+"CNFI (full, PDF)",3,0.1700156087,0.35522470110000004,True
+"CNFI (full, PDF)",4,0.1667552134,0.3637110854,True
+"CNFI (full, PDF)",5,0.16806092000000006,0.3515598874,True

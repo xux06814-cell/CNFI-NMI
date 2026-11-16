@@ -1,0 +1,16 @@
+original,alias
+age,age
+gender,gender
+height,height
+weight,weight
+ap_hi,ap_hi
+ap_lo,ap_lo
+cholesterol,cholesterol
+gluc,gluc
+smoke,smoke
+alco,alco
+active,active
+age_years,age_years
+bmi,bmi
+bp_category,bp_category
+bp_category_encoded,bp_category_encoded

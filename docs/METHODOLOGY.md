@@ -1,42 +1,88 @@
 # Method-to-code correspondence
 
-Equation numbers refer to the 20-page BDMA-2026-0010 accepted manuscript. The selector uses `graph_mode="normalized"`.
+The default `graph_mode="paper"` follows the supplied compiled manuscript
+`BDMA_2026_0010_编译后.pdf`, SHA-256
+`8da1c637d9f0dabe0ce0ff561bf74e7eda6f03a024eca3981a62c962b0771191`.
+The main equations are implemented in `src/cnfi_nmi/selector.py`; shared input,
+binning, NMI and sklearn utilities are in `normalized_selector.py`.
 
-## Stage 1: CNFI (Eqs. 1-22; pp. 4-7)
+## CNFI
 
-Only training features enter FP-Growth; the target is excluded. Numeric columns with more than five distinct values are equal-frequency binned with `pandas.qcut`, with duplicate boundaries dropped. Smaller numeric alphabets are retained as categories. Declare integer-coded categories as string/category dtype so their codes are not binned. Missing feature values form an explicit category; the benchmark tables report no missing values, so this is an implementation convention for other inputs.
+Only training predictors enter the rule miner. Numeric columns with more than
+five observed values are equal-frequency binned with `pandas.qcut`; duplicate
+boundaries are dropped. Other values retain their category identity. Declare
+integer-coded categories as string/category dtype. Missing predictors form an
+explicit state. The target never enters rule mining.
 
-Transactions contain feature-qualified value items. FP-Growth uses `max_len=2`, consistent with the scope stated in Section 5.2 (p. 17). Default support/confidence filters are .01/.1. Each qualifying single-item to single-item rule between distinct features has the metrics in Eqs. 1-5, ordered as `[Confidence, Lift, Support, Conviction, Leverage]`.
+Transactions use feature-qualified value items. `mine_pairs` counts singleton
+and pair supports by sparse matrix multiplication. This is exactly equivalent
+to FP-Growth with `max_len=2`: an infrequent singleton cannot belong to a
+frequent pair. Default support/confidence filters are .01/.1. Only rules
+between distinct features are retained. The published formula check compares
+these supports with FP-Growth on real Bank observations.
 
-Conviction is `(1-P(consequent))/(1-confidence+epsilon)`, including when confidence is below 1, with `epsilon=1e-9`. Min-max scale each metric across all qualifying rules (Eq. 7), using the same additive epsilon. A constant metric contributes zero. The rule-specific modulation uses **raw** Lift (Eqs. 6, 9):
+Metrics are ordered `[Confidence, Lift, Support, Conviction, Leverage]`.
+Conviction uses `(1-P(consequent))/(1-confidence+epsilon)`, `epsilon=1e-9`.
+The compiled manuscript's weighted sum uses **raw metric values**:
 
-$$\lambda(R)=\frac{1}{1+\exp[-\kappa(\log_2\mathrm{Lift}(R)-\theta)]}.$$
+```text
+lambda = sigmoid(kappa * (log2(Lift) - theta))
+w_strong = [.40, .20, .10, .20, .10]
+w_weak   = [.10, .20, .40, .10, .20]
+w_rule   = lambda * w_strong + (1-lambda) * w_weak
+edge_rule_weight = dot(w_rule, raw_metrics)
+```
 
-The priors match Table 1 (p. 11): `kappa=1`, `theta=0`, `strong_prior=[.40,.20,.10,.20,.10]`, `weak_prior=[.10,.20,.40,.10,.20]`. Eq. 10 interpolates these priors; Eq. 8 sums normalized metrics with the resulting weights. "Dynamic thresholding" names this logistic transition; it does not change the support/confidence filters.
+Defaults are `kappa=1`, `theta=0`. Dynamic thresholding names this logistic
+transition; support and confidence filters stay fixed. Every input feature is
+a node. Multiple value-level rules for a directed feature pair contribute their
+maximum positive weight.
 
-Every input feature is a graph node, including isolated features. Multiple value-level rules for a directed feature pair contribute their **maximum** weight. Zero-weight edges are omitted (p. 6). For adjacency `A[i,j]` from i to j:
+For adjacency `A[i,j]` from feature i to feature j, the raw Eigen-Rank equations
+are:
 
-- Eqs. 12-13: `q=(in_degree+epsilon)/(sum(in_degree)+d*epsilon)`.
-- Eq. 14: each source column of T is its normalized outgoing weights; a dangling source uses q.
-- Eq. 15: `Q=[[rho*T,q],[(1-rho)*ones(1,d),0]]`, with `rho=.85`.
-- Eq. 16: PageRank uses the **unweighted** directed graph, the same rho, uniform teleportation, and uniform dangling-mass redistribution.
-- Eqs. 17-19: influence is the equal mixture of min-max normalized PageRank and weighted out-strength, with additive epsilon.
-- Eqs. 20-21: initialize uniformly, apply `(I+Q)/2`, normalize by L1, and stop at L1 iterate difference below `1e-6`, or 1000 updates.
-- Eq. 22: `SER[i]=L[i]+influence[i]*L[d]`. An empty positive-edge graph assigns zero to every raw CNFI score (p. 6).
+```text
+q = in_degree / (sum(in_degree) + epsilon)
+Q = [[A, ones(d,1)], [q.T, 0]]
+L = ones(d+1)/(d+1)
+repeat: L_new = Q @ L; L_new /= ||L_new||_2
+stop when ||L_new-L||_2 < 1e-6
+mu = .5 * minmax(unweighted_PageRank(rho=.85))
+     + .5 * minmax(weighted_out_strength)
+SER = L[:d] + mu * L[d]
+```
 
-Audit outputs are `rules_` (value-item identities, raw/normalized metrics, lambda and weights), `graph_`, and `cnfi_values_` (raw SER). `cnfi_scores_` contains normalized **rank** scores, not raw SER.
+Min-max denominators use additive epsilon. The raw operator has no stochastic
+normalization, lazy step or damping block. `rho` applies to the separate
+PageRank term. The iteration limit is 10,000; a nonconvergent operator raises
+`ArithmeticError`. A periodic-graph regression test covers this case. An empty
+positive-edge graph receives zero raw CNFI scores.
 
-## Stage 2: NMI (Eqs. 23-28; pp. 7-8)
+Audit attributes are `rules_`, `graph_`, `cnfi_values_` (raw SER),
+`mining_audit_` and `eigen_audit_`. `cnfi_scores_` contains rank scores.
 
-All original, non-binned feature columns are evaluated independently of CNFI. Observed continuous values are empirical discrete categories. NMI uses geometric normalization:
+## NMI and rank fusion
 
-$$\mathrm{NMI}(X;Y)=\frac{I(X;Y)}{\sqrt{H(X)H(Y)}}.$$
+All original, non-binned feature columns are evaluated independently of CNFI.
+Observed continuous values are treated as empirical discrete states:
 
-A constant feature or target receives zero. Empirical NMI can be inflated for high-cardinality features; the implementation follows the paper definition rather than substituting a continuous MI estimator. Inspect `nmi_values_`.
+```text
+NMI(X,Y) = I(X;Y) / sqrt(H(X)*H(Y))
+```
 
-## Stage 3: rank fusion (Eqs. 29-31; pp. 8-9)
+A constant feature or target receives zero. Empirical NMI can favor features
+with many distinct states; inspect `nmi_values_` when interpreting the ranking.
 
-Both branches rank **all d inputs**. For each list, `R=(d-rank)/(d-1)` with one-based rank, or zero if d=1. Match by feature identity and compute `S_final=alpha*R_CNFI+(1-alpha)*R_NMI`, default alpha=.5. Ties retain input-column order, a deterministic convention where the paper does not specify tie handling. Only the fused list is truncated by `n_features_to_select`. Its default `None` implements Algorithm 1's omitted optional k_max.
+Both branches rank all d inputs. With one-based rank, the compiled manuscript's
+Eqs. 27–28 use `R=(d-rank)/d`. Fusion is
+`alpha*R_CNFI+(1-alpha)*R_NMI`, matched by feature identity, default alpha=.5.
+Ties retain input-column order. Only the final fused ranking is truncated by
+`n_features_to_select`; `None` keeps the full list. The compatibility parameter
+`cnfi_features` accepts only `None` or d.
 
-The compatibility parameter `cnfi_features` accepts only `None` or d; intermediate branch truncation is rejected.
+## Earlier normalized mode
 
+`graph_mode="normalized"` explicitly retains the earlier implementation:
+per-metric min-max scaling, epsilon-smoothed q, a column-stochastic augmented
+operator, lazy L1 iteration and rank denominator d−1. It is kept for existing
+callers. The experiment scripts use `paper` mode.

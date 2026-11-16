@@ -1,0 +1,81 @@
+{
+  "completed": true,
+  "dataset": "cardio",
+  "data_sha256": "2fd9be6ef85abc1fab91cb0e2ef1549b19f0e0325c3dce7374011adc924e1ddb",
+  "code_contract": {
+    "data_sha256": "2fd9be6ef85abc1fab91cb0e2ef1549b19f0e0325c3dce7374011adc924e1ddb",
+    "runner_sha256": "cb43f091200fb6c605015d46268a91135d66438479db6e9b47b9aa933f8c9a47",
+    "paper_selector_sha256": "f9b91accf6be5b64d1d0c6c1851f4d0c570a768f326d20a70e73da31ebb4769a",
+    "upstream_selector_sha256": "0285e01483dde3ab28dade18a5a23d053d4d111cd0bcfad906d43bd765f8078f",
+    "paper_sha256": "8da1c637d9f0dabe0ce0ff561bf74e7eda6f03a024eca3981a62c962b0771191"
+  },
+  "rows": 68613,
+  "inputs": 15,
+  "target": "cardio",
+  "positive_label": 1,
+  "categorical": [
+    "gender",
+    "cholesterol",
+    "gluc",
+    "smoke",
+    "alco",
+    "active",
+    "bp_category_encoded"
+  ],
+  "seed": 42,
+  "outer_folds": 5,
+  "inner_folds": 3,
+  "features_sweep": 12,
+  "features_ablation": 4,
+  "classifier": "LightGBM 200 trees; learning_rate .01/.05/.1 and max_depth 3/5/7; same training-only encoding and inner AUC search",
+  "selector": {
+    "alpha": 0.5,
+    "cnfi_features": null,
+    "edge_aggregation": "max",
+    "epsilon": 1e-9,
+    "graph_mode": "paper_raw",
+    "kappa": 1,
+    "max_iter": 1000,
+    "min_confidence": 0.1,
+    "min_support": 0.01,
+    "n_bins": 5,
+    "n_features_to_select": 12,
+    "rho": 0.85,
+    "strong_prior": [
+      0.4,
+      0.2,
+      0.1,
+      0.2,
+      0.1
+    ],
+    "target_col": null,
+    "theta": 0,
+    "tol": 0.000001,
+    "weak_prior": [
+      0.1,
+      0.2,
+      0.4,
+      0.1,
+      0.2
+    ]
+  },
+  "network": "first outer TRAIN fold, max symmetrization only for display",
+  "uncertainty": "sample SD across five outer folds",
+  "formula_changes": [
+    "Raw metric values in Eq.7, no per-metric min-max scaling",
+    "q=indegree/(sum(indegree)+1e-9)",
+    "Q=[[A,1],[q.T,0]], direct Q multiplication and L2 norm",
+    "(d-rank)/d in Eqs.27-28",
+    "Hour/Month/lane/vehicle counts numeric per Table2"
+  ],
+  "ablation_completion": "Standalone component definitions complete the manuscript as follows. Same feature nodes and .01/.1 rule pool, max feature-pair aggregation across methods. PGI 3-WLR on that feature graph. Multi = raw metrics dot prior midpoint [.25,.20,.25,.15,.15]. Dynamic = confidence*(.10+.30*lambda) from Eq.9 confidence coefficient. Eigen changes only ranking to PDF formula. Full uses complete raw PDF formula. This shared feature-graph PGI is an adaptation, not an exact recovery of the authors original PGI transaction preprocessing.",
+  "data_processing": "Public-source archives and the explicit preparation in data_provenance.json and data/README.md. The manuscript does not specify the exact medical cleaning bounds or resolve the traffic 85 versus 86 input count.",
+  "selection_tuning": "selection before inner search; outer test held out; alpha sweep exploratory",
+  "versions": {
+    "python": "3.12.14",
+    "pandas": "3.0.1",
+    "numpy": "2.5.4",
+    "sklearn": "1.6.1",
+    "lightgbm": "4.6.0"
+  }
+}

@@ -40,7 +40,7 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
 - CNFI 连续变量采用 5 档等频离散化；NMI 使用未经 CNFI 离散化的原始列。
 - PMI 代理严格使用 `log2(Lift)`，与原文统一以 bit 为单位。
 - NMI 使用几何均值归一化，采用修订稿的定义。
-- 秩得分严格实现 `(N-rank)/(N-1)`；单特征得分为 0。
+- 秩得分实现编译稿的 `(d-rank)/d`，排名从 1 开始；单特征得分为 0。
 - 默认参数 `min_support=0.01`、`min_confidence=0.1`、`alpha=0.5`、
   `kappa=1.0`、`theta=0.0` 以及两组先验权重均对应原文。
 - “动态阈值”指现有 Logistic 过渡机制：`theta` 是过渡中心，`kappa`
@@ -49,13 +49,29 @@ python examples/quickstart.py --csv path/to/processed.csv --target target --feat
   即指该机制。
 - 关联规则、网络、阶段得分和最终排序均作为拟合后属性公开，方便审计。
 
-默认 `graph_mode="normalized"` 对应论文的指标归一化、列随机增广算子和惰性幂迭代。
+默认 `graph_mode="paper"` 使用编译稿的原始规则指标、直接增广矩阵 Q 和 L2 幂迭代。
+旧版归一化实现保留为显式选项 `graph_mode="normalized"`。
 详见[方法映射](docs/METHODOLOGY.md)。
 经验 NMI 对高基数特征可能偏高。
 
 ## 实验运行
 
 仓库提供特征选择器、五折 LightGBM 实验和 α 敏感性扫描。使用者传入处理后数据，并显式指定 `--positive-label`，保存本次运行的结果文件。输入定义见[数据说明](data/README.md)，验证流程和参数见[实验设置](docs/REPRODUCIBILITY.md)。
+
+从公开原始数据开始复现图 5、图 6 和交通数据消融实验：
+
+```bash
+python -m pip install -e ".[experiments,test]"
+python scripts/download_public_data.py --output data/raw
+python scripts/prepare_public_data.py --raw-dir data/raw --output data/processed
+python scripts/run_paper_reproduction.py traffic --data-dir data/processed --output results/my-run
+python scripts/run_paper_reproduction.py bank --data-dir data/processed --output results/my-run
+python scripts/run_paper_reproduction.py cardio --data-dir data/processed --output results/my-run
+```
+
+上述命令读取下载、处理后的数据重新训练。已有结果需要明确加 `--resume`，且输入、
+代码和环境哈希必须一致。[公开数据实跑记录](reproduction/public-data-20261116/README.md)
+提供全部逐折指标、绘图 CSV、PNG/PDF，以及与论文数据口径和结果的对照。
 
 ## 参数敏感性与 MATLAB 绘图
 
@@ -72,6 +88,7 @@ examples/           读取使用者 CSV 的运行示例
 docs/               方法映射与严格复现规范
 paper/              论文来源与获取说明
 data/               数据集定义、来源与校验要求
+reproduction/      公开数据实跑记录与执行源码快照
 ```
 
 ## 许可说明

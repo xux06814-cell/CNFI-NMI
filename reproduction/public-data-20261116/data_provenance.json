@@ -1,0 +1,59 @@
+{
+  "traffic": {
+    "url": "https://github.com/Future-Mobility-Lab/SydneyIncidents",
+    "file": "traffic_author\\data\\merged-unlabeled.zip",
+    "sha256": "f2d8fb9840916c9b1a81e27b3049f4b0b2e6cbccd74622157001a21692d705b5",
+    "raw_rows": 85611,
+    "rows": 85611,
+    "inputs": 85,
+    "steps": [
+      "strip column whitespace",
+      "target = OR of the two binary emergency-service fields",
+      "remove both source fields",
+      "retain all author-published rows and missing predictors"
+    ],
+    "difference": "85 inputs, not the manuscript 86; no undocumented extra field added",
+    "class_counts": {
+      "0": 45896,
+      "1": 39715
+    },
+    "processed_sha256": "5b075aa827bb18c7ef9bc7f08a2096c37f83f25ac2ba88b6804f0bfe17684bde"
+  },
+  "bank": {
+    "url": "https://archive.ics.uci.edu/static/public/222/bank+marketing.zip",
+    "sha256": "e0bf5f5de5b846e2f18e9d90606637267d46dfa260e0f17bb12e605db5efbeb4",
+    "rows": 45211,
+    "inputs": 16,
+    "steps": [
+      "read complete bank-full.csv, not bank.csv sample",
+      "yes=1, no=0",
+      "preserve unknown as explicit category"
+    ],
+    "class_counts": {
+      "0": 39922,
+      "1": 5289
+    },
+    "processed_sha256": "94d25e76bf10e36a14b16efafc5e24bbe06185f64d7023559076a0cceb2cad4d"
+  },
+  "medical": {
+    "url": "https://www.kaggle.com/api/v1/datasets/download/sulianova/cardiovascular-disease-dataset",
+    "sha256": "b78ff607480810c3e27de3e11d52c4962a3a81dbb3d69365e1cf3394a67c2b23",
+    "raw_rows": 70000,
+    "rows": 68613,
+    "inputs": 15,
+    "steps": [
+      "drop id",
+      "retain ap_hi 80..250, ap_lo 40..200, ap_hi>=ap_lo, height 120..220, weight 30..200",
+      "age_years=floor(age/365.25)",
+      "bmi=weight/(height/100)^2",
+      "bp category: stage2 if hi>=140 or lo>=90, else stage1 if hi>=130 or lo>=80, else elevated if hi>=120, else normal",
+      "duplicate category as integer bp_category_encoded for paper schema"
+    ],
+    "difference": "Cleaning bounds and category definitions are explicit reconstruction choices; original full preprocessing is not in repository",
+    "class_counts": {
+      "0": 34667,
+      "1": 33946
+    },
+    "processed_sha256": "2fd9be6ef85abc1fab91cb0e2ef1549b19f0e0325c3dce7374011adc924e1ddb"
+  }
+}
